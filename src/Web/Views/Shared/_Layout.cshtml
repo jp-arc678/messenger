@@ -1,0 +1,65 @@
+@{
+    var currentUser = MessengerPrincipal.CurrentUser;
+}
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewBag.Title - ระบบแจ้งงานรับ-ส่งเอกสาร</title>
+    <link rel="stylesheet" href="@Url.Content("~/Content/bootstrap.min.css")" />
+    <link rel="stylesheet" href="@Url.Content("~/Content/site.css")" />
+</head>
+<body class="bg-body-tertiary">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand fw-semibold" href="@Url.Action("Index", "Home")">
+                ระบบแจ้งงานรับ-ส่งเอกสาร
+            </a>
+
+            @if (currentUser != null)
+            {
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+                        aria-controls="mainNav" aria-expanded="false" aria-label="สลับเมนู">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <div class="collapse navbar-collapse" id="mainNav">
+                    <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
+                        <li class="nav-item">
+                            <span class="navbar-text text-white">
+                                @currentUser.FullName
+                            </span>
+                        </li>
+                        <li class="nav-item">
+                            <span class="badge text-bg-light">สาขา @currentUser.BranchCode</span>
+                        </li>
+                        <li class="nav-item">
+                            <span class="badge text-bg-warning">@currentUser.RoleDisplayName</span>
+                        </li>
+                        <li class="nav-item">
+                            @using (Html.BeginForm("Logout", "Account", FormMethod.Post, new { @class = "d-inline" }))
+                            {
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-light">ออกจากระบบ</button>
+                            }
+                        </li>
+                    </ul>
+                </div>
+            }
+        </div>
+    </nav>
+
+    <main class="container py-4">
+        @RenderBody()
+    </main>
+
+    <footer class="container py-3 text-center text-body-secondary small">
+        Messenger Document Delivery System — Phase 0 (Foundation)
+    </footer>
+
+    <script src="@Url.Content("~/Scripts/bootstrap.bundle.min.js")"></script>
+    @RenderSection("scripts", required: false)
+</body>
+</html>

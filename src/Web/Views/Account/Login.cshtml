@@ -1,0 +1,91 @@
+@model LoginViewModel
+@{
+    ViewBag.Title = "เข้าสู่ระบบ";
+}
+
+<div class="row justify-content-center">
+    <div class="col-12 col-md-8 col-lg-6">
+
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+
+                <h1 class="h4 mb-1">เข้าสู่ระบบ</h1>
+                <p class="text-body-secondary small mb-4">
+                    ระบบแจ้งงานรับ-ส่งเอกสาร
+                </p>
+
+                <div class="alert alert-info small" role="alert">
+                    <strong>Phase 0 — SSO จำลอง</strong><br />
+                    ยังไม่ได้เชื่อมต่อ SSO จริง (D3) หน้านี้จำลองผลลัพธ์ที่ SSO จะส่งกลับมา
+                    เมื่อได้ contract จริงแล้วหน้านี้จะถูกแทนที่ด้วยการ redirect ไป SSO
+                </div>
+
+                @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">
+                        @Model.ErrorMessage
+                    </div>
+                }
+
+                @using (Html.BeginForm("Login", "Account", new { returnUrl = Model.ReturnUrl }, FormMethod.Post))
+                {
+                    @Html.AntiForgeryToken()
+
+                    <div class="mb-3">
+                        <label class="form-label" for="SelectedEmpCode">เลือกพนักงานจากรายชื่อที่ SSO รู้จัก</label>
+                        <select class="form-select" id="SelectedEmpCode" name="SelectedEmpCode">
+                            @foreach (var user in Model.SelectableUsers)
+                            {
+                                <option value="@user.EmpCode" selected="@(user.EmpCode == Model.SelectedEmpCode)">
+                                    @user.BranchCode &nbsp;·&nbsp; @user.EmpCode &nbsp;·&nbsp; @user.FullName (@user.UnitName)
+                                </option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label" for="EmpCode">หรือพิมพ์รหัสพนักงานเอง</label>
+                        <input type="text" class="form-control" id="EmpCode" name="EmpCode"
+                               value="@Model.EmpCode" placeholder="เช่น 10001" autocomplete="off" />
+                        <div class="form-text">ถ้ากรอกช่องนี้ ระบบจะใช้ค่านี้แทนรายชื่อที่เลือกด้านบน</div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">เข้าสู่ระบบ</button>
+                }
+
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h2 class="h6">รหัสสำหรับทดสอบ</h2>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th scope="col">รหัส</th>
+                                <th scope="col">ชื่อ</th>
+                                <th scope="col">สาขา</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var user in Model.SelectableUsers)
+                            {
+                                <tr>
+                                    <td><code>@user.EmpCode</code></td>
+                                    <td>@user.FullName</td>
+                                    <td>@user.BranchCode</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <p class="form-text mb-0">
+                    รหัส 10099 และ 20099 ยังไม่มีในตาราง Employee — ใช้ทดสอบว่าระบบ cache ข้อมูลจาก SSO
+                    ให้อัตโนมัติ (BR-7) และให้สิทธิ์เริ่มต้นเป็น User (D10)
+                </p>
+            </div>
+        </div>
+
+    </div>
+</div>

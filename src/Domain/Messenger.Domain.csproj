@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>Messenger.Domain</RootNamespace>
+    <AssemblyName>Messenger.Domain</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <!-- ไฟล์ซอร์สมีข้อความภาษาไทย บังคับให้ compiler อ่านเป็น UTF-8 -->
+    <CodePage>65001</CodePage>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+  </PropertyGroup>
+
+</Project>

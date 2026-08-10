@@ -1,0 +1,18 @@
+/* สไตล์เฉพาะของระบบ — ทับ Bootstrap เท่าที่จำเป็นเท่านั้น */
+
+body {
+    /* ฟอนต์ที่อ่านภาษาไทยได้ดีบน Windows และมือถือ */
+    font-family: "Noto Sans Thai", "Sarabun", "Leelawadee UI", "Segoe UI", Tahoma, sans-serif;
+}
+
+dt {
+    font-weight: 500;
+    color: #495057;
+}
+
+/* จอเล็ก (มือถือ/แท็บเล็ต) : ทำให้ปุ่มกดง่ายขึ้น */
+@media (max-width: 576px) {
+    .btn {
+        min-height: 44px;
+    }
+}

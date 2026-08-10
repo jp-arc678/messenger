@@ -1,0 +1,261 @@
+# CLAUDE.md — Messenger Document Delivery System (Rebuild)
+
+> ไฟล์นี้คือ context หลักของโปรเจกต์ อ่านทั้งไฟล์ก่อนเริ่มทำงานทุกครั้ง
+> ห้ามเดาสิ่งที่ไม่ได้เขียนไว้ ถ้าไม่ชัดเจนให้ถามก่อน (ดูหัวข้อ Open Questions ท้ายไฟล์)
+
+---
+
+## 1. ภาพรวมระบบ (Purpose)
+
+ระบบ web application สำหรับ **แจ้งงานรับ-ส่งเอกสารภายนอก** ให้เจ้าหน้าที่ Messenger
+เป็นการ **รื้อระบบเก่า (อายุ ~15 ปี) มาเขียนใหม่ทั้งหมด** สามารถปรับปรุงให้ดีกว่าเดิมได้
+
+Flow หลัก: พนักงาน (User) แจ้งงาน → Messenger รับงาน/ยืนยัน → เดินทางไปส่ง ถ่ายรูปยืนยัน → ปิดงาน → ระบบส่งเมลแจ้งผู้แจ้ง
+
+**Scope:** ใช้ใน **บริษัทเดียว มี 2 สาขา (SDC, SBK)** ใช้ **database ร่วมกัน** แต่ **แยกข้อมูลตามสาขา** แต่ละสาขามี Messenger และ Admin ของตัวเอง
+
+---
+
+## 2. Tech Stack
+
+| ส่วน | เลือกใช้ |
+|---|---|
+| ภาษา | C# |
+| Framework | **ASP.NET MVC 5 (.NET Framework 4.8)** |
+| Data access | **Dapper + Stored Procedures** (requirement ระบุใช้ View + stored procedure) |
+| Database | SQL Server 2014 |
+| Frontend | Razor Views + Bootstrap 5 (responsive, ใช้บนมือถือ/แท็บเล็ตได้) |
+| Host | IIS |
+| รูปภาพ | เก็บบน **filesystem** (เก็บ path ใน DB, **ไม่เก็บ binary ใน DB**) |
+| Unit test | **NUnit** |
+
+หลักการ: **business logic ทั้งหมดอยู่ใน Service layer เท่านั้น** ห้ามอยู่ใน Controller หรือ View
+
+### 2.1 Dev Environment (เครื่องพัฒนาปัจจุบัน — ตรวจสอบแล้ว 2026-08-10)
+
+| รายการ | ค่า |
+|---|---|
+| Build | MSBuild 17.14 จาก **VS 2022 Build Tools** — `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\MSBuild.exe` |
+| .NET Framework 4.8 | ✅ reference assemblies + `Microsoft.WebApplication.targets` ครบ (build MVC 5 ได้) |
+| NuGet restore | ผ่าน `msbuild -t:restore` (ไม่มี `nuget.exe` แยก — ใช้ **PackageReference** ไม่ใช้ packages.config) |
+| .NET SDK | 9.0.315 (มีติดตั้ง แต่**ไม่ใช้**กับโปรเจกต์นี้) |
+| SQL Server | `localhost` (instance ชื่อ `MSSQLSERVER`, เครื่อง **SDC591**) = SQL Server 2022 · มี `localhost\SQLEXPRESS` อีกตัวแต่ไม่ได้ใช้ |
+| SSMS | SSMS 22 |
+
+**Database ที่ใช้ dev:**
+
+| รายการ | ค่า |
+|---|---|
+| Server | `localhost` (หรือ `SDC591`) — Windows Authentication |
+| Database | `MessengerDb` |
+| Collation | `Thai_CI_AS` |
+| Compatibility level | **120 (= SQL Server 2014)** — ตั้งไว้เพื่อกันการเผลอใช้ T-SQL ที่ SQL 2014 ไม่รองรับ |
+| ไฟล์ | `C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\MessengerDb.mdf` |
+| สคริปต์สร้าง | [src/Database/000_CreateDatabase.sql](src/Database/000_CreateDatabase.sql) (รันซ้ำได้) |
+| Connection string (dev) | `Server=localhost;Database=MessengerDb;Integrated Security=SSPI;` |
+
+> เข้าดูเองได้ที่ SSMS → เชื่อมต่อ `localhost` ด้วย Windows Authentication → ฐาน `MessengerDb`
+
+---
+
+## 3. Architecture & Folder Structure
+
+แบ่งเป็น layer ชัดเจน:
+
+```
+/src
+  /Web            → Controllers, Views, ViewModels, wwwroot (Bootstrap, JS)
+  /Application    → Services (business rules ทั้งหมด), interfaces, DTOs
+  /Domain         → Entities, enums (Status, Role, JobType), state machine
+  /Infrastructure → Repositories (Dapper → stored procedures), SSO client, EmailSender, FileStorage
+  /Database       → DDL scripts, stored procedures, views, seed data (เรียงตาม migration)
+/tests
+  /UnitTests      → เทสต์ business rules (BR-1..BR-8) และ state machine
+```
+
+**Module ตาม domain (8 ก้อน):**
+1. Auth + SSO
+2. Multi-branch (แยกตามสาขา SDC/SBK, ใช้ DB ร่วมกัน)
+3. ฟอร์มแจ้งงาน (User)
+4. Messenger workflow (คิว/ยืนยัน/สถานะ)
+5. Photo capture & storage
+6. Notification (email)
+7. Reporting / dashboard
+8. Admin / master data
+
+---
+
+## 4. Domain Glossary
+
+**สาขา (Branch):** `SDC`, `SBK` — หน่วยแยกข้อมูล (isolation) ทั้งระบบ
+
+**ประเภทงาน (JobType)** — เลือกได้มากกว่า 1, ระบุรายละเอียดเพิ่มต่อแต่ละอันได้:
+`SendDoc` ส่งเอกสาร · `ReceiveDoc` รับเอกสาร · `ReceiveCheck` รับเช็ค · `PlaceBill` วางบิล · `RenewTax` ต่อภาษี · `Other` อื่นๆ
+
+**Role (3 ระดับ):** `A-Admin` · `U-User` · `M-Messenger`
+
+**Status (5 สถานะ):**
+`Received` รับแจ้ง · `Delivering` กำลังส่ง · `Paused` พักการส่ง · `Completed` เสร็จงานแล้ว · `Cancelled` ยกเลิก
+
+---
+
+## 5. Role Matrix
+
+| การกระทำ | A-Admin | U-User | M-Messenger |
+|---|:---:|:---:|:---:|
+| สร้างใบแจ้งงาน | ✅ | ✅ | ✅ |
+| แก้ใบงานตัวเอง (สถานะ Received) | ✅ | ✅ | ✅ |
+| แก้ใบงานคนอื่น | ✅ | ❌ | ❌ |
+| แก้ได้ทุกช่อง ทุกสถานะ | ✅ | ❌ | ❌ |
+| เห็นคิวงานของสาขา | ✅ | เฉพาะใบตัวเอง | ✅ |
+| ยืนยัน/จัดลำดับงาน (Received→Delivering) | ✅ | ❌ | ✅ |
+| เปลี่ยนสถานะ (pause/complete/cancel) | ✅ | ยกเลิกได้เฉพาะตอน Received (ใบตัวเอง) | ✅ |
+| อัปโหลดรูปยืนยัน | ✅ | ❌ | ✅ |
+| ดู dashboard/รายงาน | ✅ (ทั้งสาขา) | เฉพาะของตัวเอง | ✅ (ทั้งสาขา) |
+| จัดการ master data / role | ✅ | ❌ | ❌ |
+
+> - ทุก role ถูกจำกัด scope ตาม **สาขา (branchCode)** ของตัวเองเสมอ (ดู BR-6)
+> - **Admin จำกัดเฉพาะสาขาตัวเอง** (ไม่ใช่ global) และทุก record ของ Admin ต้องระบุว่ามาจากสาขาไหน
+
+---
+
+## 6. Status State Machine
+
+Agent **ห้ามสร้าง transition ที่ไม่มีในตารางนี้** เด็ดขาด ทุกการเปลี่ยนสถานะต้องบันทึกลง StatusHistory (ใคร/เมื่อไหร่/หมายเหตุ)
+
+| จาก | ไป | ใครทำได้ | เงื่อนไข (guard) |
+|---|---|---|---|
+| *(สร้างใหม่)* | Received | User/Admin/Messenger | คำนวณ sendDate ตาม BR-1, gen เลขใบงานตาม BR-8 |
+| Received | Delivering | Messenger/Admin | Messenger ยืนยันวัน-เวลา-ลำดับ → ล็อกการแก้ของ User (BR-2) |
+| Received | Cancelled | User(เจ้าของ)/Messenger/Admin | ยกเลิกได้เฉพาะก่อน Messenger ยืนยันรับงาน |
+| Delivering | Paused | Messenger/Admin | ต้องระบุเหตุผลพัก |
+| Paused | Delivering | Messenger/Admin | — |
+| Delivering | Completed | Messenger/Admin | ผ่านเงื่อนไขปิดงาน BR-4 → trigger email (BR-5) |
+| Delivering | Cancelled | Messenger/Admin | ต้องระบุเหตุผล |
+| Paused | Cancelled | Messenger/Admin | ต้องระบุเหตุผล |
+| Completed | — | *(terminal)* | — |
+| Cancelled | — | *(terminal)* | — |
+
+---
+
+## 7. Business Rules
+
+**BR-1 — วันที่ส่ง (sendDate) default:**
+1. ตั้งต้น sendDate = วันที่บันทึก
+2. ถ้าเวลาบันทึก **หลัง 10:00** → sendDate = วันถัดไป
+   *(เปรียบเทียบแบบ `>` เท่านั้น: 10:00:00 ตรง = ยังไม่เกิน → sendDate = วันนี้; 10:00:01 = เกิน)*
+3. หลังจากข้อ 2 แล้ว ถ้า sendDate ตกวัน **เสาร์/อาทิตย์** → เลื่อนเป็นวันจันทร์
+   *(กฎต้อง compose กันได้ เช่น ศุกร์ 11:00 → พรุ่งนี้เสาร์ → เลื่อนเป็นจันทร์)*
+   *(ยังไม่ต้องรองรับวันหยุดนักขัตฤกษ์ — ดู D6)*
+   *(User สามารถแก้ sendDate เองทีหลังได้ ถ้ายัง Received)*
+
+**BR-2 — Edit lock:** ใบงานแก้ได้โดย User เจ้าของ **เฉพาะสถานะ Received เท่านั้น** เมื่อ Messenger ยืนยัน (→ Delivering) จะถูกล็อก, มีเพียง Admin ที่แก้ได้ทุกสถานะ ใช้ **optimistic locking (rowversion)** กันชนกันตอนแก้พร้อมกัน
+
+**BR-3 — รูปภาพ:** ตอนส่งงานถ่ายรูปยืนยัน เลือกประเภทรูป (`send`/`receive`), **resize ฝั่ง client ให้ ≤ 2MB** ก่อนอัปโหลด, เก็บไฟล์บน filesystem เก็บ path ใน DB
+**รูปเป็น optional เสมอ** — ไม่ใช่เงื่อนไขบังคับของการปิดงาน (ดู BR-4)
+
+**BR-4 — เงื่อนไขปิดงาน:** ถ้าใบงานมีประเภท `ReceiveDoc` (รับเอกสารกลับมาให้ผู้แจ้ง) ต้อง **กดยืนยันว่ารับของแล้ว** ก่อนจึงเปลี่ยนเป็น Completed ได้ — **ไม่บังคับว่าต้องมีรูป**
+ใบงานที่ไม่มี `ReceiveDoc` ปิดงานได้เลยโดยไม่มีเงื่อนไขเพิ่ม
+
+**BR-5 — Email:** เมื่อจบ process (→ Completed) ส่งเมลแจ้งพนักงานผู้แจ้งอัตโนมัติ *(รายละเอียด SMTP ยัง TBD — ดู D5; ทำผ่าน interface `IEmailSender` แล้ว mock ไปก่อน)*
+
+**BR-6 — Branch isolation:** ทุก query/หน้าจอต้อง filter ตาม **สาขา (branchCode)** ของผู้ใช้เสมอ Messenger/User เห็นเฉพาะงานสาขาตัวเอง ทั้ง 2 สาขาใช้ **DB เดียวร่วมกัน** ต้องบังคับ isolation ที่ระดับ **repository/service ไม่ใช่แค่ UI**
+
+**BR-7 — SSO:** ข้อมูลผู้ใช้มาจาก Single Sign-On: รหัสพนักงาน, ชื่อ, รหัสแผนก, ชื่อหน่วยงาน, เบอร์ภายใน, e-mail, **รหัสสาขา (branchCode)** พนักงานทุกคนใช้ระบบได้ ระบบไม่เก็บ password เอง (เฟส 0 ทำเป็น stub/mock ก่อน — ดู D3)
+
+**BR-8 — เลขใบงาน (reqNo):** รูปแบบ `MSG-{BRANCH}-{YYMM}-{NNNN}`
+- `{BRANCH}` = `SDC` หรือ `SBK`
+- `{YYMM}` = ปี 2 หลัก + เดือน 2 หลัก
+- `{NNNN}` = running 4 หลัก, **แยกลำดับตาม (สาขา + YYMM)** และ **reset ทุกเดือน**
+- ตัวอย่าง: `MSG-SDC-2608-0001`, `MSG-SBK-2608-0001`
+
+---
+
+## 8. Data Model (core entities)
+
+- **Branch** (branchCode `SDC`/`SBK`, name)
+- **Employee** (empCode, name, deptCode, unitName, phoneExt, email, **branchCode**) — cache จาก SSO
+- **UserRole** (empCode, branchCode, role) — **1 คนมีได้ 1 role เท่านั้น ห้ามซ้อน**, คนใหม่/คนที่ยังไม่มีแถว = `U-User` เสมอ
+- **DeliveryRequest** (reqNo `MSG-{BRANCH}-{YYMM}-{NNNN}`, **branchCode**, requesterEmpCode, requestDateTime, sendDate, contactName, address, phone, detail, status, isPersonal, receiptConfirmed (BR-4), rowVersion, createdBy/At, updatedBy/At)
+  - `isPersonal` = แยกงานฝากส่วนตัว vs งานบริษัท **ใช้เพื่อ filter/รายงานเท่านั้น ไม่มีผลกับ flow หรือ business rule ใด ๆ**
+- **RequestJobType** (reqId, jobType, detailText) — 1 ใบมีได้หลายประเภท
+- **ReqNoSequence** (branchCode, yymm, lastNumber) — สำหรับ gen running ตาม BR-8
+- **MessengerAssignment** (reqId, messengerEmpCode, confirmedAt, sequenceOrder, route, distanceKm, returnToOffice)
+  - แต่ละสาขามี Messenger ประจำ **คนเดียว** → **เปลี่ยนตัว Messenger กลางคันไม่ได้**
+  - `sequenceOrder` = ลำดับการวิ่งงาน **ต่อวัน (ต่อสาขา)** ไม่ต้องแยกต่อ Messenger
+- **DeliveryPhoto** (reqId, photoType `send`/`receive`, filePath, capturedAt, capturedBy)
+- **StatusHistory** (reqId, fromStatus, toStatus, byEmpCode, at, note) — audit trail
+- **PauseReason / CancelReason** (reqId, reason, byEmpCode, at)
+
+---
+
+## 9. Development Phases
+
+> **สำคัญมาก:** ทำทีละเฟสตามลำดับ **ห้ามข้าม ห้ามเขียนโค้ดของเฟสถัดไปล่วงหน้า**
+> จบแต่ละเฟสแล้ว **หยุดรอ approval** ก่อนเริ่มเฟสใหม่ (ดูหัวข้อ 10)
+
+**Phase 0 — Foundation**
+Goal: โครงโปรเจกต์ + DB schema + auth 3 roles + SSO stub + branch seed (SDC, SBK)
+Done when: รันโปรเจกต์เปล่าขึ้น, login ด้วย mock SSO ได้ (มี branchCode), DDL สร้างตารางหลักครบ, role resolve ถูก
+
+**Phase 1 — Core: ฟอร์มแจ้งงาน (User)**
+Goal: สร้าง/แก้/ดู ใบแจ้งงาน, 6 ประเภทงาน (multi-select + detail), กฎ BR-1, BR-2, gen เลขใบงาน BR-8
+Done when: สร้างใบงานได้, reqNo ถูกตาม BR-8, sendDate คำนวณถูกตาม BR-1, edit-lock ทำงานตาม BR-2, มี unit test คลุม BR-1 + BR-2 + BR-8
+
+**Phase 2 — Messenger workflow**
+Goal: หน้าคิวงาน, ค้นตามวันบันทึก/วันส่ง (ช่วงวันที่), ยืนยัน + จัดลำดับ, เปลี่ยนสถานะตาม state machine
+Done when: Messenger ยืนยันงาน (Received→Delivering) ได้, pause/resume/cancel ทำงานตามตาราง §6, มี unit test คลุม state machine
+
+**Phase 3 — Photo**
+Goal: ถ่าย/อัปโหลดรูป, resize client-side ≤2MB, เก็บ filesystem, เงื่อนไขปิดงาน BR-4
+Done when: อัปโหลดรูป + เลือกประเภทได้, ไฟล์ >2MB ถูกย่อก่อนส่ง, ปิดงานได้เฉพาะเมื่อรูปครบตาม BR-4
+
+**Phase 4 — Notification**
+Goal: ส่งเมลตอน Completed (BR-5) ผ่าน `IEmailSender` (mock ก่อน)
+Done when: ปิดงานแล้ว trigger เมลถึงผู้แจ้ง, มี template + ปรับ config ได้
+
+**Phase 5 — Reporting / Dashboard**
+Goal: รายงานสรุปรายวัน + export
+Done when: หน้าสรุปรายวันแสดงจำนวนงาน/สถานะ/ต่อ Messenger (แยกตามสาขา), export ได้
+
+**Phase 6 — Branch isolation + Hardening + Responsive polish + UAT**
+Goal: บังคับ BR-6 ครบทุกจุด, ตรวจ authorization, ทดสอบบนมือถือ/แท็บเล็ต
+Done when: ผู้ใช้ต่างสาขา (SDC/SBK) เห็นข้อมูลแยกกันสมบูรณ์บน DB เดียว, ผ่าน checklist UAT
+
+---
+
+## 10. Working Agreement (กติกาการทำงานของ Agent)
+
+1. **ทำทีละเฟสตามลำดับ** เริ่มทุกงานด้วยการบอกว่า "กำลังทำ Phase N"
+2. **ห้ามเขียนโค้ดของเฟสถัดไป** แม้จะเห็นว่าต้องใช้ในอนาคต
+3. จบเฟส → รัน/ตรวจให้ผ่าน → สรุปสิ่งที่ทำ + วิธีทดสอบ → **หยุดรอคำว่า "approved ไป Phase N+1"** ห้ามไปต่อเอง
+4. Business rule ที่ยุ่ง (BR-1, BR-2, BR-8, state machine) **ต้องเขียน unit test เสมอ**
+5. **ห้ามสร้าง status transition** ที่ไม่มีใน §6
+6. Business logic อยู่ใน Service layer เท่านั้น
+7. งาน DB ทุกอย่างต้องเป็น **DDL/migration + stored procedure script ที่รันได้จริง** ห้าม assume schema เงียบๆ
+8. จะเพิ่ม dependency / library ใหม่ ต้องถามก่อน
+9. เจอความกำกวม → หยุดถาม อย่าเดา (เพิ่มเข้า Open Questions)
+
+---
+
+## 11. Enhancements (ทำเมื่อ core เสร็จ — อย่าเพิ่งทำในเฟส 0-6 เว้นแต่สั่ง)
+
+Audit trail เต็มรูปแบบ · แจ้งเตือนผ่าน LINE (Notify/OA) เสริมอีเมล · ลายเซ็นดิจิทัลผู้รับ · QR/barcode ต่อใบงาน · SLA/aging flag งานเกินกำหนด (เตือนงานแจ้งหลัง 9:00) · Dashboard KPI (เวลาเฉลี่ยจนเสร็จ, ยอดยกเลิก) · PWA + GPS tag บนรูป
+
+---
+
+## 12. Open Questions / Decisions
+
+- **D1 — Framework:** ✅ ASP.NET MVC 5 (.NET Framework 4.8)
+- **D2 — Scope/Admin:** ✅ บริษัทเดียว 2 สาขา (SDC, SBK) ใช้ DB ร่วมกัน, isolation ตามสาขา, Admin จำกัดเฉพาะสาขาตัวเอง + ระบุสาขาต้นสังกัด
+- **D3 — SSO:** ⏳ ยังไม่แน่ใจ contract — ใช้ mock ไปก่อน (เฟส 0)
+- **D4 — เลขใบงาน:** ✅ `MSG-{BRANCH}-{YYMM}-{NNNN}` running 4 หลักแยกตามสาขา+เดือน reset รายเดือน (ดู BR-8)
+- **D5 — Email:** ⏳ ยังไม่แน่ใจ SMTP — ทำผ่าน `IEmailSender` + mock ไปก่อน
+- **D6 — Holiday:** ✅ ยังไม่ต้องรองรับวันหยุดนักขัตฤกษ์ (BR-1 คิดแค่เสาร์-อาทิตย์)
+- **D7 — ใครยกเลิกงานได้:** ✅ **Messenger และ Admin ยกเลิกได้ทุกสถานะที่ยังไม่ terminal** (Received/Delivering/Paused) · **User ยกเลิกได้เฉพาะใบตัวเองตอนสถานะ Received** (ก่อน Messenger รับงาน) — ปรับ §5/§6 ให้ตรงกันแล้ว
+- **D8 — BR-1 เกณฑ์เวลา:** ✅ ใช้ `>` เท่านั้น (10:00:00 ตรง ยังนับเป็นวันนี้)
+- **D9 — BR-4 เงื่อนไขปิดงาน:** ✅ **แก้กฎใหม่** — `ReceiveDoc` ต้อง**กดยืนยันรับของ**อย่างเดียวพอ **ไม่บังคับรูป**; รูปทั้งหมดเป็น optional
+- **D10 — Role:** ✅ 1 คน = 1 role ห้ามซ้อน, default = `U-User` เสมอ (คนใหม่เข้าระบบเริ่มที่ User ทันที)
+- **D11 — Messenger:** ✅ แต่ละสาขามี Messenger ประจำคนเดียว, เปลี่ยนตัวกลางคันไม่ได้, `sequenceOrder` เป็นลำดับ**ต่อวัน**
+- **D12 — Test framework:** ✅ **NUnit**
+- **D13 — Dev DB:** ✅ สร้าง `MessengerDb` บน `localhost` (Windows Auth) แล้ว — รายละเอียดดู §2.1

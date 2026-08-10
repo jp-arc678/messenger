@@ -1,0 +1,39 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.dll
+*.pdb
+*.exe
+
+# NuGet
+packages/
+*.nupkg
+!packages/build/
+
+# Visual Studio / user-specific
+.vs/
+*.user
+*.suo
+*.userprefs
+*.sln.docstates
+
+# Test results
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+
+# Logs & temp
+*.log
+*.tmp
+_ReSharper*/
+
+# ไฟล์รูปที่ Messenger อัปโหลด (เก็บบน filesystem ไม่เข้า git)
+/uploads/
+/App_Data/uploads/
+
+# ค่า config เฉพาะเครื่อง (connection string ฯลฯ)
+*.config.local
+appsettings.local.json
