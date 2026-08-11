@@ -12,15 +12,15 @@ SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 GO
 
-/* ---------- vw_EmployeeRole ----------
+/* ---------- vwEmployeeRole ----------
    พนักงาน + สาขา + role ที่ resolve แล้ว
-   D10 : คนที่ยังไม่มีแถวใน UserRole ให้ถือเป็น 'U' (User) เสมอ
-   ------------------------------------- */
-IF OBJECT_ID(N'dbo.vw_EmployeeRole', N'V') IS NOT NULL
-    DROP VIEW dbo.vw_EmployeeRole;
+   D10 : คนที่ยังไม่มีแถวใน tblUserRole ให้ถือเป็น 'U' (User) เสมอ
+   ------------------------------------ */
+IF OBJECT_ID(N'dbo.vwEmployeeRole', N'V') IS NOT NULL
+    DROP VIEW dbo.vwEmployeeRole;
 GO
 
-CREATE VIEW dbo.vw_EmployeeRole
+CREATE VIEW dbo.vwEmployeeRole
 AS
 SELECT
     e.EmpCode,
@@ -33,10 +33,10 @@ SELECT
     b.BranchName,
     e.IsActive,
     ISNULL(ur.RoleCode, 'U') AS RoleCode
-FROM dbo.Employee AS e
-INNER JOIN dbo.Branch AS b
+FROM dbo.tblEmployee AS e
+INNER JOIN dbo.tblBranch AS b
         ON b.BranchCode = e.BranchCode
-LEFT JOIN dbo.UserRole AS ur
+LEFT JOIN dbo.tblUserRole AS ur
         ON ur.EmpCode = e.EmpCode;
 GO
 

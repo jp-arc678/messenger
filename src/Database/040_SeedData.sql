@@ -14,11 +14,11 @@ SET QUOTED_IDENTIFIER ON;
 GO
 
 /* ---------- สาขา ---------- */
-IF NOT EXISTS (SELECT 1 FROM dbo.Branch WHERE BranchCode = 'SDC')
-    INSERT INTO dbo.Branch (BranchCode, BranchName) VALUES ('SDC', N'สำนักงานสาขา SDC');
+IF NOT EXISTS (SELECT 1 FROM dbo.tblBranch WHERE BranchCode = 'SDC')
+    INSERT INTO dbo.tblBranch (BranchCode, BranchName) VALUES ('SDC', N'สำนักงานสาขา SDC');
 
-IF NOT EXISTS (SELECT 1 FROM dbo.Branch WHERE BranchCode = 'SBK')
-    INSERT INTO dbo.Branch (BranchCode, BranchName) VALUES ('SBK', N'สำนักงานสาขา SBK');
+IF NOT EXISTS (SELECT 1 FROM dbo.tblBranch WHERE BranchCode = 'SBK')
+    INSERT INTO dbo.tblBranch (BranchCode, BranchName) VALUES ('SBK', N'สำนักงานสาขา SBK');
 GO
 
 /* ---------- พนักงาน mock ----------
@@ -50,19 +50,19 @@ VALUES
     ('20003', N'ธนา เร็วรี่',      'ADM', N'ฝ่ายธุรการ',            '2301', N'thana@example.co.th',    'SBK', 'M'),
     ('20004', N'ชูใจ ตั้งใจ',      'HR',  N'ฝ่ายทรัพยากรบุคคล',     '2401', N'chujai@example.co.th',   'SBK', 'U');
 
-INSERT INTO dbo.Employee (EmpCode, FullName, DeptCode, UnitName, PhoneExt, Email, BranchCode)
+INSERT INTO dbo.tblEmployee (EmpCode, FullName, DeptCode, UnitName, PhoneExt, Email, BranchCode)
 SELECT s.EmpCode, s.FullName, s.DeptCode, s.UnitName, s.PhoneExt, s.Email, s.BranchCode
 FROM @Emp AS s
-WHERE NOT EXISTS (SELECT 1 FROM dbo.Employee AS e WHERE e.EmpCode = s.EmpCode);
+WHERE NOT EXISTS (SELECT 1 FROM dbo.tblEmployee AS e WHERE e.EmpCode = s.EmpCode);
 
-INSERT INTO dbo.UserRole (EmpCode, BranchCode, RoleCode, CreatedBy)
+INSERT INTO dbo.tblUserRole (EmpCode, BranchCode, RoleCode, CreatedBy)
 SELECT s.EmpCode, s.BranchCode, s.RoleCode, N'SEED'
 FROM @Emp AS s
-WHERE NOT EXISTS (SELECT 1 FROM dbo.UserRole AS r WHERE r.EmpCode = s.EmpCode);
+WHERE NOT EXISTS (SELECT 1 FROM dbo.tblUserRole AS r WHERE r.EmpCode = s.EmpCode);
 GO
 
 PRINT '--- 040_SeedData.sql completed ---';
 
-SELECT BranchCode, BranchName FROM dbo.Branch ORDER BY BranchCode;
-SELECT EmpCode, FullName, BranchCode, RoleCode FROM dbo.vw_EmployeeRole ORDER BY BranchCode, RoleCode, EmpCode;
+SELECT BranchCode, BranchName FROM dbo.tblBranch ORDER BY BranchCode;
+SELECT EmpCode, FullName, BranchCode, RoleCode FROM dbo.vwEmployeeRole ORDER BY BranchCode, RoleCode, EmpCode;
 GO

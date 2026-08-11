@@ -4,7 +4,7 @@ using Messenger.Domain.Enums;
 namespace Messenger.Infrastructure.Repositories
 {
     /// <summary>
-    /// รูปร่างของแถวที่ stored procedure ส่งกลับมา (ตรงกับ view dbo.vw_EmployeeRole)
+    /// รูปร่างของแถวที่ stored procedure ส่งกลับมา (ตรงกับ view dbo.vwEmployeeRole)
     /// แยกจาก entity เพราะ DB เก็บ role เป็นตัวอักษรเดียว แต่ domain ใช้ enum
     /// </summary>
     internal class EmployeeRow

@@ -6,6 +6,8 @@
    - เขียนให้เข้ากับ SQL Server 2014 (compat 120)
      ห้ามใช้ DROP ... IF EXISTS / STRING_AGG (2016+)
    - ข้อความภาษาไทยใช้ NVARCHAR ทั้งหมด
+   - Naming : ตาราง = tbl, view = vw, stored procedure = sp, function = fn
+              (ต่อท้ายด้วย PascalCase ไม่มี underscore คั่น)
    ============================================================= */
 
 USE [MessengerDb];
@@ -14,25 +16,25 @@ SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 GO
 
-/* ---------- 1) Branch : สาขา (หน่วย isolation ของทั้งระบบ) ---------- */
-IF OBJECT_ID(N'dbo.Branch', N'U') IS NULL
+/* ---------- 1) tblBranch : สาขา (หน่วย isolation ของทั้งระบบ) ---------- */
+IF OBJECT_ID(N'dbo.tblBranch', N'U') IS NULL
 BEGIN
-    CREATE TABLE dbo.Branch
+    CREATE TABLE dbo.tblBranch
     (
         BranchCode  CHAR(3)         NOT NULL,
         BranchName  NVARCHAR(100)   NOT NULL,
-        IsActive    BIT             NOT NULL CONSTRAINT DF_Branch_IsActive  DEFAULT (1),
-        CreatedAt   DATETIME2(0)    NOT NULL CONSTRAINT DF_Branch_CreatedAt DEFAULT (SYSDATETIME()),
-        CONSTRAINT PK_Branch PRIMARY KEY CLUSTERED (BranchCode)
+        IsActive    BIT             NOT NULL CONSTRAINT DFtblBranchIsActive  DEFAULT (1),
+        CreatedAt   DATETIME2(0)    NOT NULL CONSTRAINT DFtblBranchCreatedAt DEFAULT (SYSDATETIME()),
+        CONSTRAINT PKtblBranch PRIMARY KEY CLUSTERED (BranchCode)
     );
-    PRINT 'Created table dbo.Branch';
+    PRINT 'Created table dbo.tblBranch';
 END
 GO
 
-/* ---------- 2) Employee : cache ข้อมูลพนักงานจาก SSO (BR-7) ---------- */
-IF OBJECT_ID(N'dbo.Employee', N'U') IS NULL
+/* ---------- 2) tblEmployee : cache ข้อมูลพนักงานจาก SSO (BR-7) ---------- */
+IF OBJECT_ID(N'dbo.tblEmployee', N'U') IS NULL
 BEGIN
-    CREATE TABLE dbo.Employee
+    CREATE TABLE dbo.tblEmployee
     (
         EmpCode     VARCHAR(20)     NOT NULL,
         FullName    NVARCHAR(200)   NOT NULL,
@@ -41,136 +43,143 @@ BEGIN
         PhoneExt    VARCHAR(20)     NULL,
         Email       NVARCHAR(200)   NULL,
         BranchCode  CHAR(3)         NOT NULL,
-        IsActive    BIT             NOT NULL CONSTRAINT DF_Employee_IsActive  DEFAULT (1),
-        SyncedAt    DATETIME2(0)    NOT NULL CONSTRAINT DF_Employee_SyncedAt  DEFAULT (SYSDATETIME()),
-        CreatedAt   DATETIME2(0)    NOT NULL CONSTRAINT DF_Employee_CreatedAt DEFAULT (SYSDATETIME()),
+        IsActive    BIT             NOT NULL CONSTRAINT DFtblEmployeeIsActive  DEFAULT (1),
+        SyncedAt    DATETIME2(0)    NOT NULL CONSTRAINT DFtblEmployeeSyncedAt  DEFAULT (SYSDATETIME()),
+        CreatedAt   DATETIME2(0)    NOT NULL CONSTRAINT DFtblEmployeeCreatedAt DEFAULT (SYSDATETIME()),
         UpdatedAt   DATETIME2(0)    NULL,
-        CONSTRAINT PK_Employee          PRIMARY KEY CLUSTERED (EmpCode),
-        CONSTRAINT FK_Employee_Branch   FOREIGN KEY (BranchCode) REFERENCES dbo.Branch (BranchCode)
+        CONSTRAINT PKtblEmployee            PRIMARY KEY CLUSTERED (EmpCode),
+        CONSTRAINT FKtblEmployeeBranch      FOREIGN KEY (BranchCode) REFERENCES dbo.tblBranch (BranchCode)
     );
-    CREATE INDEX IX_Employee_BranchCode ON dbo.Employee (BranchCode) INCLUDE (FullName, Email);
-    PRINT 'Created table dbo.Employee';
+    CREATE INDEX IXtblEmployeeBranchCode ON dbo.tblEmployee (BranchCode) INCLUDE (FullName, Email);
+    PRINT 'Created table dbo.tblEmployee';
 END
 GO
 
-/* ---------- 3) UserRole : สิทธิ์ผู้ใช้ ----------
+/* ---------- 3) tblUserRole : สิทธิ์ผู้ใช้ ----------
    D10 — 1 คนมีได้ 1 role เท่านั้น ห้ามซ้อน  →  PK เป็น EmpCode เดี่ยว ๆ
    คนที่ไม่มีแถวในตารางนี้ = U-User โดยปริยาย (resolve ที่ service layer)
-   ------------------------------------------------------------------ */
-IF OBJECT_ID(N'dbo.UserRole', N'U') IS NULL
+   -------------------------------------------------- */
+IF OBJECT_ID(N'dbo.tblUserRole', N'U') IS NULL
 BEGIN
-    CREATE TABLE dbo.UserRole
+    CREATE TABLE dbo.tblUserRole
     (
         EmpCode     VARCHAR(20)     NOT NULL,
         BranchCode  CHAR(3)         NOT NULL,
         RoleCode    CHAR(1)         NOT NULL,   -- A=Admin, U=User, M=Messenger
         CreatedBy   VARCHAR(20)     NULL,
-        CreatedAt   DATETIME2(0)    NOT NULL CONSTRAINT DF_UserRole_CreatedAt DEFAULT (SYSDATETIME()),
+        CreatedAt   DATETIME2(0)    NOT NULL CONSTRAINT DFtblUserRoleCreatedAt DEFAULT (SYSDATETIME()),
         UpdatedBy   VARCHAR(20)     NULL,
         UpdatedAt   DATETIME2(0)    NULL,
-        CONSTRAINT PK_UserRole           PRIMARY KEY CLUSTERED (EmpCode),
-        CONSTRAINT FK_UserRole_Employee  FOREIGN KEY (EmpCode)    REFERENCES dbo.Employee (EmpCode),
-        CONSTRAINT FK_UserRole_Branch    FOREIGN KEY (BranchCode) REFERENCES dbo.Branch (BranchCode),
-        CONSTRAINT CK_UserRole_RoleCode  CHECK (RoleCode IN ('A', 'U', 'M'))
+        CONSTRAINT PKtblUserRole            PRIMARY KEY CLUSTERED (EmpCode),
+        CONSTRAINT FKtblUserRoleEmployee    FOREIGN KEY (EmpCode)    REFERENCES dbo.tblEmployee (EmpCode),
+        CONSTRAINT FKtblUserRoleBranch      FOREIGN KEY (BranchCode) REFERENCES dbo.tblBranch (BranchCode),
+        CONSTRAINT CKtblUserRoleRoleCode    CHECK (RoleCode IN ('A', 'U', 'M'))
     );
-    CREATE INDEX IX_UserRole_Branch_Role ON dbo.UserRole (BranchCode, RoleCode);
-    PRINT 'Created table dbo.UserRole';
+    CREATE INDEX IXtblUserRoleBranchRole ON dbo.tblUserRole (BranchCode, RoleCode);
+    PRINT 'Created table dbo.tblUserRole';
 END
 GO
 
-/* ---------- 4) ReqNoSequence : running number ตาม BR-8 ----------
+/* ---------- 4) tblReqNoSequence : running number ตาม BR-8 ----------
    แยกลำดับตาม (สาขา + YYMM) และ reset ทุกเดือนโดยธรรมชาติ
    เพราะขึ้นแถวใหม่เมื่อเปลี่ยนเดือน
-   --------------------------------------------------------------- */
-IF OBJECT_ID(N'dbo.ReqNoSequence', N'U') IS NULL
+   ----------------------------------------------------------------- */
+IF OBJECT_ID(N'dbo.tblReqNoSequence', N'U') IS NULL
 BEGIN
-    CREATE TABLE dbo.ReqNoSequence
+    CREATE TABLE dbo.tblReqNoSequence
     (
         BranchCode  CHAR(3)         NOT NULL,
         YyMm        CHAR(4)         NOT NULL,   -- ปี 2 หลัก + เดือน 2 หลัก เช่น '2608'
-        LastNumber  INT             NOT NULL CONSTRAINT DF_ReqNoSequence_LastNumber DEFAULT (0),
-        UpdatedAt   DATETIME2(0)    NOT NULL CONSTRAINT DF_ReqNoSequence_UpdatedAt  DEFAULT (SYSDATETIME()),
-        CONSTRAINT PK_ReqNoSequence         PRIMARY KEY CLUSTERED (BranchCode, YyMm),
-        CONSTRAINT FK_ReqNoSequence_Branch  FOREIGN KEY (BranchCode) REFERENCES dbo.Branch (BranchCode),
-        CONSTRAINT CK_ReqNoSequence_Last    CHECK (LastNumber >= 0)
+        LastNumber  INT             NOT NULL CONSTRAINT DFtblReqNoSequenceLastNumber DEFAULT (0),
+        UpdatedAt   DATETIME2(0)    NOT NULL CONSTRAINT DFtblReqNoSequenceUpdatedAt  DEFAULT (SYSDATETIME()),
+        CONSTRAINT PKtblReqNoSequence       PRIMARY KEY CLUSTERED (BranchCode, YyMm),
+        CONSTRAINT FKtblReqNoSequenceBranch FOREIGN KEY (BranchCode) REFERENCES dbo.tblBranch (BranchCode),
+        CONSTRAINT CKtblReqNoSequenceLast   CHECK (LastNumber >= 0)
     );
-    PRINT 'Created table dbo.ReqNoSequence';
+    PRINT 'Created table dbo.tblReqNoSequence';
 END
 GO
 
-/* ---------- 5) DeliveryRequest : ใบแจ้งงาน (entity หลัก) ---------- */
-IF OBJECT_ID(N'dbo.DeliveryRequest', N'U') IS NULL
+/* ---------- 5) tblDeliveryRequest : ใบแจ้งงาน (entity หลัก) ----------
+   D15 — ContactName / Address / Detail เป็นข้อมูลบังคับกรอก
+         จึงเป็น NOT NULL และมี CHECK กันการส่งช่องว่างล้วนมาแทน
+         ส่วน Phone ยังปล่อยว่างได้
+   -------------------------------------------------------------------- */
+IF OBJECT_ID(N'dbo.tblDeliveryRequest', N'U') IS NULL
 BEGIN
-    CREATE TABLE dbo.DeliveryRequest
+    CREATE TABLE dbo.tblDeliveryRequest
     (
         ReqId               INT             IDENTITY(1,1) NOT NULL,
         ReqNo               VARCHAR(20)     NOT NULL,   -- MSG-{BRANCH}-{YYMM}-{NNNN}
         BranchCode          CHAR(3)         NOT NULL,   -- BR-6 branch isolation
-        RequesterEmpCode    VARCHAR(20)     NOT NULL,
+        RequesterEmpCode    VARCHAR(20)     NOT NULL,   -- D17 อาจไม่ใช่คนที่กดสร้าง (แจ้งแทนได้)
         RequestDateTime     DATETIME2(0)    NOT NULL,   -- เวลาที่บันทึก (ใช้คิด BR-1)
         SendDate            DATE            NOT NULL,   -- วันที่ส่ง (BR-1)
-        ContactName         NVARCHAR(200)   NULL,
-        Address             NVARCHAR(1000)  NULL,
+        ContactName         NVARCHAR(200)   NOT NULL,
+        Address             NVARCHAR(1000)  NOT NULL,
         Phone               VARCHAR(50)     NULL,
-        Detail              NVARCHAR(MAX)   NULL,
+        Detail              NVARCHAR(MAX)   NOT NULL,
         Status              VARCHAR(20)     NOT NULL,
-        IsPersonal          BIT             NOT NULL CONSTRAINT DF_DeliveryRequest_IsPersonal DEFAULT (0),
+        IsPersonal          BIT             NOT NULL CONSTRAINT DFtblDeliveryRequestIsPersonal DEFAULT (0),
         -- BR-4 : ถ้าใบงานมี ReceiveDoc ต้องกดยืนยันรับของก่อนปิดงาน (ไม่บังคับรูป)
-        ReceiptConfirmed    BIT             NOT NULL CONSTRAINT DF_DeliveryRequest_ReceiptConfirmed DEFAULT (0),
+        ReceiptConfirmed    BIT             NOT NULL CONSTRAINT DFtblDeliveryRequestReceiptConfirmed DEFAULT (0),
         ReceiptConfirmedAt  DATETIME2(0)    NULL,
         ReceiptConfirmedBy  VARCHAR(20)     NULL,
         [RowVersion]        ROWVERSION      NOT NULL,   -- BR-2 optimistic locking
-        CreatedBy           VARCHAR(20)     NOT NULL,
-        CreatedAt           DATETIME2(0)    NOT NULL CONSTRAINT DF_DeliveryRequest_CreatedAt DEFAULT (SYSDATETIME()),
+        CreatedBy           VARCHAR(20)     NOT NULL,   -- คนที่กดสร้างจริง
+        CreatedAt           DATETIME2(0)    NOT NULL CONSTRAINT DFtblDeliveryRequestCreatedAt DEFAULT (SYSDATETIME()),
         UpdatedBy           VARCHAR(20)     NULL,
         UpdatedAt           DATETIME2(0)    NULL,
-        CONSTRAINT PK_DeliveryRequest           PRIMARY KEY CLUSTERED (ReqId),
-        CONSTRAINT UQ_DeliveryRequest_ReqNo     UNIQUE (ReqNo),
-        CONSTRAINT FK_DeliveryRequest_Branch    FOREIGN KEY (BranchCode)       REFERENCES dbo.Branch (BranchCode),
-        CONSTRAINT FK_DeliveryRequest_Requester FOREIGN KEY (RequesterEmpCode) REFERENCES dbo.Employee (EmpCode),
-        CONSTRAINT CK_DeliveryRequest_Status    CHECK (Status IN ('Received', 'Delivering', 'Paused', 'Completed', 'Cancelled'))
+        CONSTRAINT PKtblDeliveryRequest             PRIMARY KEY CLUSTERED (ReqId),
+        CONSTRAINT UQtblDeliveryRequestReqNo        UNIQUE (ReqNo),
+        CONSTRAINT FKtblDeliveryRequestBranch       FOREIGN KEY (BranchCode)       REFERENCES dbo.tblBranch (BranchCode),
+        CONSTRAINT FKtblDeliveryRequestRequester    FOREIGN KEY (RequesterEmpCode) REFERENCES dbo.tblEmployee (EmpCode),
+        CONSTRAINT CKtblDeliveryRequestStatus       CHECK (Status IN ('Received', 'Delivering', 'Paused', 'Completed', 'Cancelled')),
+        CONSTRAINT CKtblDeliveryRequestContactName  CHECK (LEN(LTRIM(RTRIM(ContactName))) > 0),
+        CONSTRAINT CKtblDeliveryRequestAddress      CHECK (LEN(LTRIM(RTRIM(Address))) > 0),
+        CONSTRAINT CKtblDeliveryRequestDetail       CHECK (LEN(LTRIM(RTRIM(Detail))) > 0)
     );
 
     -- คิวงานของสาขา (Phase 2) : filter ตามสาขา + สถานะ + วันส่ง
-    CREATE INDEX IX_DeliveryRequest_Branch_Status_SendDate
-        ON dbo.DeliveryRequest (BranchCode, Status, SendDate) INCLUDE (ReqNo, RequesterEmpCode);
+    CREATE INDEX IXtblDeliveryRequestBranchStatusSendDate
+        ON dbo.tblDeliveryRequest (BranchCode, Status, SendDate) INCLUDE (ReqNo, RequesterEmpCode);
     -- "ใบงานของฉัน" (U-User เห็นเฉพาะใบตัวเอง)
-    CREATE INDEX IX_DeliveryRequest_Branch_Requester
-        ON dbo.DeliveryRequest (BranchCode, RequesterEmpCode) INCLUDE (ReqNo, Status, SendDate);
+    CREATE INDEX IXtblDeliveryRequestBranchRequester
+        ON dbo.tblDeliveryRequest (BranchCode, RequesterEmpCode) INCLUDE (ReqNo, Status, SendDate);
     -- ค้นตามช่วงวันบันทึก
-    CREATE INDEX IX_DeliveryRequest_Branch_RequestDateTime
-        ON dbo.DeliveryRequest (BranchCode, RequestDateTime);
+    CREATE INDEX IXtblDeliveryRequestBranchRequestDateTime
+        ON dbo.tblDeliveryRequest (BranchCode, RequestDateTime);
 
-    PRINT 'Created table dbo.DeliveryRequest';
+    PRINT 'Created table dbo.tblDeliveryRequest';
 END
 GO
 
-/* ---------- 6) RequestJobType : ประเภทงาน (1 ใบมีได้หลายประเภท) ---------- */
-IF OBJECT_ID(N'dbo.RequestJobType', N'U') IS NULL
+/* ---------- 6) tblRequestJobType : ประเภทงาน (1 ใบมีได้หลายประเภท) ---------- */
+IF OBJECT_ID(N'dbo.tblRequestJobType', N'U') IS NULL
 BEGIN
-    CREATE TABLE dbo.RequestJobType
+    CREATE TABLE dbo.tblRequestJobType
     (
         ReqJobTypeId    INT             IDENTITY(1,1) NOT NULL,
         ReqId           INT             NOT NULL,
         JobType         VARCHAR(20)     NOT NULL,
         DetailText      NVARCHAR(500)   NULL,
-        CONSTRAINT PK_RequestJobType            PRIMARY KEY CLUSTERED (ReqJobTypeId),
-        CONSTRAINT UQ_RequestJobType_Req_Type   UNIQUE (ReqId, JobType),
-        CONSTRAINT FK_RequestJobType_Request    FOREIGN KEY (ReqId) REFERENCES dbo.DeliveryRequest (ReqId) ON DELETE CASCADE,
-        CONSTRAINT CK_RequestJobType_JobType    CHECK (JobType IN ('SendDoc', 'ReceiveDoc', 'ReceiveCheck', 'PlaceBill', 'RenewTax', 'Other'))
+        CONSTRAINT PKtblRequestJobType          PRIMARY KEY CLUSTERED (ReqJobTypeId),
+        CONSTRAINT UQtblRequestJobTypeReqType   UNIQUE (ReqId, JobType),
+        CONSTRAINT FKtblRequestJobTypeRequest   FOREIGN KEY (ReqId) REFERENCES dbo.tblDeliveryRequest (ReqId) ON DELETE CASCADE,
+        CONSTRAINT CKtblRequestJobTypeJobType   CHECK (JobType IN ('SendDoc', 'ReceiveDoc', 'ReceiveCheck', 'PlaceBill', 'RenewTax', 'Other'))
     );
-    PRINT 'Created table dbo.RequestJobType';
+    PRINT 'Created table dbo.tblRequestJobType';
 END
 GO
 
-/* ---------- 7) MessengerAssignment : การรับงานของ Messenger ----------
+/* ---------- 7) tblMessengerAssignment : การรับงานของ Messenger ----------
    D11 — แต่ละสาขามี Messenger ประจำคนเดียว เปลี่ยนตัวกลางคันไม่ได้
          → 1 ใบงาน = 1 assignment (UNIQUE ReqId)
          → SequenceOrder เป็นลำดับ "ต่อวัน" ไม่แยกต่อ Messenger
-   --------------------------------------------------------------------- */
-IF OBJECT_ID(N'dbo.MessengerAssignment', N'U') IS NULL
+   ------------------------------------------------------------------- */
+IF OBJECT_ID(N'dbo.tblMessengerAssignment', N'U') IS NULL
 BEGIN
-    CREATE TABLE dbo.MessengerAssignment
+    CREATE TABLE dbo.tblMessengerAssignment
     (
         AssignmentId        INT             IDENTITY(1,1) NOT NULL,
         ReqId               INT             NOT NULL,
@@ -180,23 +189,23 @@ BEGIN
         Route               NVARCHAR(500)   NULL,
         DistanceKm          DECIMAL(9,2)    NULL,
         ReturnToOffice      BIT             NULL,
-        CreatedAt           DATETIME2(0)    NOT NULL CONSTRAINT DF_MessengerAssignment_CreatedAt DEFAULT (SYSDATETIME()),
+        CreatedAt           DATETIME2(0)    NOT NULL CONSTRAINT DFtblMessengerAssignmentCreatedAt DEFAULT (SYSDATETIME()),
         UpdatedAt           DATETIME2(0)    NULL,
-        CONSTRAINT PK_MessengerAssignment           PRIMARY KEY CLUSTERED (AssignmentId),
-        CONSTRAINT UQ_MessengerAssignment_ReqId     UNIQUE (ReqId),
-        CONSTRAINT FK_MessengerAssignment_Request   FOREIGN KEY (ReqId)            REFERENCES dbo.DeliveryRequest (ReqId) ON DELETE CASCADE,
-        CONSTRAINT FK_MessengerAssignment_Messenger FOREIGN KEY (MessengerEmpCode) REFERENCES dbo.Employee (EmpCode),
-        CONSTRAINT CK_MessengerAssignment_Sequence  CHECK (SequenceOrder > 0)
+        CONSTRAINT PKtblMessengerAssignment             PRIMARY KEY CLUSTERED (AssignmentId),
+        CONSTRAINT UQtblMessengerAssignmentReqId        UNIQUE (ReqId),
+        CONSTRAINT FKtblMessengerAssignmentRequest      FOREIGN KEY (ReqId)            REFERENCES dbo.tblDeliveryRequest (ReqId) ON DELETE CASCADE,
+        CONSTRAINT FKtblMessengerAssignmentMessenger    FOREIGN KEY (MessengerEmpCode) REFERENCES dbo.tblEmployee (EmpCode),
+        CONSTRAINT CKtblMessengerAssignmentSequence     CHECK (SequenceOrder > 0)
     );
-    CREATE INDEX IX_MessengerAssignment_Messenger ON dbo.MessengerAssignment (MessengerEmpCode, ConfirmedAt);
-    PRINT 'Created table dbo.MessengerAssignment';
+    CREATE INDEX IXtblMessengerAssignmentMessenger ON dbo.tblMessengerAssignment (MessengerEmpCode, ConfirmedAt);
+    PRINT 'Created table dbo.tblMessengerAssignment';
 END
 GO
 
-/* ---------- 8) DeliveryPhoto : รูปยืนยัน (BR-3, เก็บ path เท่านั้น) ---------- */
-IF OBJECT_ID(N'dbo.DeliveryPhoto', N'U') IS NULL
+/* ---------- 8) tblDeliveryPhoto : รูปยืนยัน (BR-3, เก็บ path เท่านั้น) ---------- */
+IF OBJECT_ID(N'dbo.tblDeliveryPhoto', N'U') IS NULL
 BEGIN
-    CREATE TABLE dbo.DeliveryPhoto
+    CREATE TABLE dbo.tblDeliveryPhoto
     (
         PhotoId         INT             IDENTITY(1,1) NOT NULL,
         ReqId           INT             NOT NULL,
@@ -206,72 +215,72 @@ BEGIN
         FileSizeBytes   INT             NULL,
         CapturedAt      DATETIME2(0)    NOT NULL,
         CapturedBy      VARCHAR(20)     NOT NULL,
-        CONSTRAINT PK_DeliveryPhoto             PRIMARY KEY CLUSTERED (PhotoId),
-        CONSTRAINT FK_DeliveryPhoto_Request     FOREIGN KEY (ReqId) REFERENCES dbo.DeliveryRequest (ReqId) ON DELETE CASCADE,
-        CONSTRAINT CK_DeliveryPhoto_PhotoType   CHECK (PhotoType IN ('send', 'receive'))
+        CONSTRAINT PKtblDeliveryPhoto           PRIMARY KEY CLUSTERED (PhotoId),
+        CONSTRAINT FKtblDeliveryPhotoRequest    FOREIGN KEY (ReqId) REFERENCES dbo.tblDeliveryRequest (ReqId) ON DELETE CASCADE,
+        CONSTRAINT CKtblDeliveryPhotoPhotoType  CHECK (PhotoType IN ('send', 'receive'))
     );
-    CREATE INDEX IX_DeliveryPhoto_Req_Type ON dbo.DeliveryPhoto (ReqId, PhotoType);
-    PRINT 'Created table dbo.DeliveryPhoto';
+    CREATE INDEX IXtblDeliveryPhotoReqType ON dbo.tblDeliveryPhoto (ReqId, PhotoType);
+    PRINT 'Created table dbo.tblDeliveryPhoto';
 END
 GO
 
-/* ---------- 9) StatusHistory : audit trail ทุกการเปลี่ยนสถานะ (§6) ----------
+/* ---------- 9) tblStatusHistory : audit trail ทุกการเปลี่ยนสถานะ (§6) ----------
    FromStatus = NULL หมายถึงตอนสร้างใบงานใหม่
-   ------------------------------------------------------------------------- */
-IF OBJECT_ID(N'dbo.StatusHistory', N'U') IS NULL
+   ---------------------------------------------------------------------------- */
+IF OBJECT_ID(N'dbo.tblStatusHistory', N'U') IS NULL
 BEGIN
-    CREATE TABLE dbo.StatusHistory
+    CREATE TABLE dbo.tblStatusHistory
     (
         HistoryId   BIGINT          IDENTITY(1,1) NOT NULL,
         ReqId       INT             NOT NULL,
         FromStatus  VARCHAR(20)     NULL,
         ToStatus    VARCHAR(20)     NOT NULL,
         ByEmpCode   VARCHAR(20)     NOT NULL,
-        ChangedAt   DATETIME2(0)    NOT NULL CONSTRAINT DF_StatusHistory_ChangedAt DEFAULT (SYSDATETIME()),
+        ChangedAt   DATETIME2(0)    NOT NULL CONSTRAINT DFtblStatusHistoryChangedAt DEFAULT (SYSDATETIME()),
         Note        NVARCHAR(1000)  NULL,
-        CONSTRAINT PK_StatusHistory             PRIMARY KEY CLUSTERED (HistoryId),
-        CONSTRAINT FK_StatusHistory_Request     FOREIGN KEY (ReqId) REFERENCES dbo.DeliveryRequest (ReqId) ON DELETE CASCADE,
-        CONSTRAINT CK_StatusHistory_FromStatus  CHECK (FromStatus IS NULL OR FromStatus IN ('Received', 'Delivering', 'Paused', 'Completed', 'Cancelled')),
-        CONSTRAINT CK_StatusHistory_ToStatus    CHECK (ToStatus IN ('Received', 'Delivering', 'Paused', 'Completed', 'Cancelled'))
+        CONSTRAINT PKtblStatusHistory           PRIMARY KEY CLUSTERED (HistoryId),
+        CONSTRAINT FKtblStatusHistoryRequest    FOREIGN KEY (ReqId) REFERENCES dbo.tblDeliveryRequest (ReqId) ON DELETE CASCADE,
+        CONSTRAINT CKtblStatusHistoryFromStatus CHECK (FromStatus IS NULL OR FromStatus IN ('Received', 'Delivering', 'Paused', 'Completed', 'Cancelled')),
+        CONSTRAINT CKtblStatusHistoryToStatus   CHECK (ToStatus IN ('Received', 'Delivering', 'Paused', 'Completed', 'Cancelled'))
     );
-    CREATE INDEX IX_StatusHistory_Req ON dbo.StatusHistory (ReqId, ChangedAt);
-    PRINT 'Created table dbo.StatusHistory';
+    CREATE INDEX IXtblStatusHistoryReq ON dbo.tblStatusHistory (ReqId, ChangedAt);
+    PRINT 'Created table dbo.tblStatusHistory';
 END
 GO
 
-/* ---------- 10) PauseReason : เหตุผลการพักงาน (พักได้หลายครั้ง) ---------- */
-IF OBJECT_ID(N'dbo.PauseReason', N'U') IS NULL
+/* ---------- 10) tblPauseReason : เหตุผลการพักงาน (พักได้หลายครั้ง) ---------- */
+IF OBJECT_ID(N'dbo.tblPauseReason', N'U') IS NULL
 BEGIN
-    CREATE TABLE dbo.PauseReason
+    CREATE TABLE dbo.tblPauseReason
     (
         PauseReasonId   INT             IDENTITY(1,1) NOT NULL,
         ReqId           INT             NOT NULL,
         Reason          NVARCHAR(1000)  NOT NULL,
         ByEmpCode       VARCHAR(20)     NOT NULL,
-        PausedAt        DATETIME2(0)    NOT NULL CONSTRAINT DF_PauseReason_PausedAt DEFAULT (SYSDATETIME()),
-        CONSTRAINT PK_PauseReason           PRIMARY KEY CLUSTERED (PauseReasonId),
-        CONSTRAINT FK_PauseReason_Request   FOREIGN KEY (ReqId) REFERENCES dbo.DeliveryRequest (ReqId) ON DELETE CASCADE
+        PausedAt        DATETIME2(0)    NOT NULL CONSTRAINT DFtblPauseReasonPausedAt DEFAULT (SYSDATETIME()),
+        CONSTRAINT PKtblPauseReason         PRIMARY KEY CLUSTERED (PauseReasonId),
+        CONSTRAINT FKtblPauseReasonRequest  FOREIGN KEY (ReqId) REFERENCES dbo.tblDeliveryRequest (ReqId) ON DELETE CASCADE
     );
-    CREATE INDEX IX_PauseReason_Req ON dbo.PauseReason (ReqId, PausedAt);
-    PRINT 'Created table dbo.PauseReason';
+    CREATE INDEX IXtblPauseReasonReq ON dbo.tblPauseReason (ReqId, PausedAt);
+    PRINT 'Created table dbo.tblPauseReason';
 END
 GO
 
-/* ---------- 11) CancelReason : เหตุผลการยกเลิก (terminal → 1 ใบ 1 ครั้ง) ---------- */
-IF OBJECT_ID(N'dbo.CancelReason', N'U') IS NULL
+/* ---------- 11) tblCancelReason : เหตุผลการยกเลิก (terminal → 1 ใบ 1 ครั้ง) ---------- */
+IF OBJECT_ID(N'dbo.tblCancelReason', N'U') IS NULL
 BEGIN
-    CREATE TABLE dbo.CancelReason
+    CREATE TABLE dbo.tblCancelReason
     (
         CancelReasonId  INT             IDENTITY(1,1) NOT NULL,
         ReqId           INT             NOT NULL,
         Reason          NVARCHAR(1000)  NOT NULL,
         ByEmpCode       VARCHAR(20)     NOT NULL,
-        CancelledAt     DATETIME2(0)    NOT NULL CONSTRAINT DF_CancelReason_CancelledAt DEFAULT (SYSDATETIME()),
-        CONSTRAINT PK_CancelReason          PRIMARY KEY CLUSTERED (CancelReasonId),
-        CONSTRAINT UQ_CancelReason_ReqId    UNIQUE (ReqId),
-        CONSTRAINT FK_CancelReason_Request  FOREIGN KEY (ReqId) REFERENCES dbo.DeliveryRequest (ReqId) ON DELETE CASCADE
+        CancelledAt     DATETIME2(0)    NOT NULL CONSTRAINT DFtblCancelReasonCancelledAt DEFAULT (SYSDATETIME()),
+        CONSTRAINT PKtblCancelReason        PRIMARY KEY CLUSTERED (CancelReasonId),
+        CONSTRAINT UQtblCancelReasonReqId   UNIQUE (ReqId),
+        CONSTRAINT FKtblCancelReasonRequest FOREIGN KEY (ReqId) REFERENCES dbo.tblDeliveryRequest (ReqId) ON DELETE CASCADE
     );
-    PRINT 'Created table dbo.CancelReason';
+    PRINT 'Created table dbo.tblCancelReason';
 END
 GO
 

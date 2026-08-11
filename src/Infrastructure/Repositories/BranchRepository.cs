@@ -24,7 +24,7 @@ namespace Messenger.Infrastructure.Repositories
             using (var connection = _connectionFactory.CreateConnection())
             {
                 var branches = connection.Query<Branch>(
-                    "dbo.usp_Branch_List",
+                    "dbo.spBranchList",
                     commandType: CommandType.StoredProcedure);
 
                 // BranchCode เป็น CHAR(3) จึงถูก pad ช่องว่างมาจาก DB ต้อง trim ก่อนใช้เทียบ

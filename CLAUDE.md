@@ -56,6 +56,23 @@ Flow หลัก: พนักงาน (User) แจ้งงาน → Messen
 
 > เข้าดูเองได้ที่ SSMS → เชื่อมต่อ `localhost` ด้วย Windows Authentication → ฐาน `MessengerDb`
 
+### 2.2 Database Naming Convention (D14 — บังคับใช้ทุก object)
+
+**prefix ติดกับชื่อเลย ไม่มี underscore คั่น** ชื่อหลัง prefix เป็น PascalCase
+
+| ชนิด object | prefix | ตัวอย่าง |
+|---|---|---|
+| Table | `tbl` | `tblBranch`, `tblDeliveryRequest`, `tblReqNoSequence` |
+| View | `vw` | `vwEmployeeRole` |
+| Stored procedure | `sp` | `spBranchList`, `spEmployeeUpsertFromSso` |
+| Function | `fn` | `fnCalcSendDate` |
+
+constraint/index ให้อิงชื่อตารางเต็ม: `PKtblBranch` · `FKtblUserRoleEmployee` · `IXtblDeliveryRequestBranchStatusSendDate` · `CKtblDeliveryRequestStatus` · `UQtblDeliveryRequestReqNo` · `DFtblBranchIsActive`
+
+> **ต้องเรียก stored procedure ด้วย `dbo.` นำหน้าเสมอ** (เช่น `dbo.spBranchList`)
+> ไม่ใช่แค่เรื่องความสะอาด — เป็นการเลี่ยงพฤติกรรมของ SQL Server ที่จะไปค้น `master` ก่อน
+> เมื่อเจอชื่อขึ้นต้นด้วย `sp` และช่วยให้ execution plan ถูก cache ใช้ซ้ำได้
+
 ---
 
 ## 3. Architecture & Folder Structure
@@ -104,6 +121,7 @@ Flow หลัก: พนักงาน (User) แจ้งงาน → Messen
 | การกระทำ | A-Admin | U-User | M-Messenger |
 |---|:---:|:---:|:---:|
 | สร้างใบแจ้งงาน | ✅ | ✅ | ✅ |
+| แจ้งงานแทนคนอื่น (เลือกผู้แจ้ง) | ✅ | ✅ | ✅ |
 | แก้ใบงานตัวเอง (สถานะ Received) | ✅ | ✅ | ✅ |
 | แก้ใบงานคนอื่น | ✅ | ❌ | ❌ |
 | แก้ได้ทุกช่อง ทุกสถานะ | ✅ | ❌ | ❌ |
@@ -116,6 +134,9 @@ Flow หลัก: พนักงาน (User) แจ้งงาน → Messen
 
 > - ทุก role ถูกจำกัด scope ตาม **สาขา (branchCode)** ของตัวเองเสมอ (ดู BR-6)
 > - **Admin จำกัดเฉพาะสาขาตัวเอง** (ไม่ใช่ global) และทุก record ของ Admin ต้องระบุว่ามาจากสาขาไหน
+> - **แจ้งงานแทนคนอื่น (D17):** ทุก role เลือก `requesterEmpCode` เป็นใครก็ได้ **ที่อยู่สาขาเดียวกับตัวเอง**
+>   ค่าเริ่มต้นคือตัวเอง · `createdBy` ยังคงบันทึกคนที่กดสร้างจริงเสมอ (แยกจากผู้แจ้ง)
+>   · เมื่อแจ้งแทนคนอื่น ใบงานนั้นถือเป็น "ใบของผู้แจ้ง" — สิทธิ์แก้/ยกเลิกเป็นของผู้แจ้ง ไม่ใช่คนกรอก
 
 ---
 
@@ -147,7 +168,12 @@ Agent **ห้ามสร้าง transition ที่ไม่มีในต
 3. หลังจากข้อ 2 แล้ว ถ้า sendDate ตกวัน **เสาร์/อาทิตย์** → เลื่อนเป็นวันจันทร์
    *(กฎต้อง compose กันได้ เช่น ศุกร์ 11:00 → พรุ่งนี้เสาร์ → เลื่อนเป็นจันทร์)*
    *(ยังไม่ต้องรองรับวันหยุดนักขัตฤกษ์ — ดู D6)*
-   *(User สามารถแก้ sendDate เองทีหลังได้ ถ้ายัง Received)*
+
+**ข้อ 2 และ 3 ใช้เฉพาะตอนคำนวณค่า default เท่านั้น** — เมื่อผู้ใช้แก้ `sendDate` เองทีหลัง
+(ทำได้เฉพาะสถานะ `Received`) ระบบ **ไม่เลื่อนวันให้อัตโนมัติ** แต่ **ตรวจไม่ให้เลือก** ตาม D16:
+- ❌ ห้ามเลือกวันที่**ย้อนหลัง** (ก่อนวันนี้)
+- ❌ ห้ามเลือก**วันเสาร์/อาทิตย์**
+- ต้องบังคับที่ **service layer** ไม่ใช่แค่ปิดปุ่มบนหน้าจอ
 
 **BR-2 — Edit lock:** ใบงานแก้ได้โดย User เจ้าของ **เฉพาะสถานะ Received เท่านั้น** เมื่อ Messenger ยืนยัน (→ Delivering) จะถูกล็อก, มีเพียง Admin ที่แก้ได้ทุกสถานะ ใช้ **optimistic locking (rowversion)** กันชนกันตอนแก้พร้อมกัน
 
@@ -173,19 +199,24 @@ Agent **ห้ามสร้าง transition ที่ไม่มีในต
 
 ## 8. Data Model (core entities)
 
-- **Branch** (branchCode `SDC`/`SBK`, name)
-- **Employee** (empCode, name, deptCode, unitName, phoneExt, email, **branchCode**) — cache จาก SSO
-- **UserRole** (empCode, branchCode, role) — **1 คนมีได้ 1 role เท่านั้น ห้ามซ้อน**, คนใหม่/คนที่ยังไม่มีแถว = `U-User` เสมอ
-- **DeliveryRequest** (reqNo `MSG-{BRANCH}-{YYMM}-{NNNN}`, **branchCode**, requesterEmpCode, requestDateTime, sendDate, contactName, address, phone, detail, status, isPersonal, receiptConfirmed (BR-4), rowVersion, createdBy/At, updatedBy/At)
+> ชื่อตารางจริงใน DB ใช้ prefix ตาม §2.2 (`tblBranch`, `tblEmployee`, ...)
+
+- **Branch** → `tblBranch` (branchCode `SDC`/`SBK`, name)
+- **Employee** → `tblEmployee` (empCode, name, deptCode, unitName, phoneExt, email, **branchCode**) — cache จาก SSO
+- **UserRole** → `tblUserRole` (empCode, branchCode, roleCode) — **1 คนมีได้ 1 role เท่านั้น ห้ามซ้อน** (บังคับด้วย PK ที่ empCode), คนใหม่/คนที่ยังไม่มีแถว = `U-User` เสมอ
+- **DeliveryRequest** → `tblDeliveryRequest` (reqNo `MSG-{BRANCH}-{YYMM}-{NNNN}`, **branchCode**, requesterEmpCode, requestDateTime, sendDate, contactName, address, phone, detail, status, isPersonal, receiptConfirmed (BR-4), rowVersion, createdBy/At, updatedBy/At)
+  - **บังคับกรอก (NOT NULL + CHECK ห้ามเป็นช่องว่างล้วน) ตาม D15:** `contactName`, `address`, `detail`
+  - **ไม่บังคับ:** `phone`
+  - `requesterEmpCode` = ผู้แจ้ง (อาจไม่ใช่คนกรอก ดู D17) · `createdBy` = คนที่กดสร้างจริง
   - `isPersonal` = แยกงานฝากส่วนตัว vs งานบริษัท **ใช้เพื่อ filter/รายงานเท่านั้น ไม่มีผลกับ flow หรือ business rule ใด ๆ**
-- **RequestJobType** (reqId, jobType, detailText) — 1 ใบมีได้หลายประเภท
-- **ReqNoSequence** (branchCode, yymm, lastNumber) — สำหรับ gen running ตาม BR-8
-- **MessengerAssignment** (reqId, messengerEmpCode, confirmedAt, sequenceOrder, route, distanceKm, returnToOffice)
+- **RequestJobType** → `tblRequestJobType` (reqId, jobType, detailText) — 1 ใบมีได้หลายประเภท
+- **ReqNoSequence** → `tblReqNoSequence` (branchCode, yymm, lastNumber) — สำหรับ gen running ตาม BR-8
+- **MessengerAssignment** → `tblMessengerAssignment` (reqId, messengerEmpCode, confirmedAt, sequenceOrder, route, distanceKm, returnToOffice)
   - แต่ละสาขามี Messenger ประจำ **คนเดียว** → **เปลี่ยนตัว Messenger กลางคันไม่ได้**
   - `sequenceOrder` = ลำดับการวิ่งงาน **ต่อวัน (ต่อสาขา)** ไม่ต้องแยกต่อ Messenger
-- **DeliveryPhoto** (reqId, photoType `send`/`receive`, filePath, capturedAt, capturedBy)
-- **StatusHistory** (reqId, fromStatus, toStatus, byEmpCode, at, note) — audit trail
-- **PauseReason / CancelReason** (reqId, reason, byEmpCode, at)
+- **DeliveryPhoto** → `tblDeliveryPhoto` (reqId, photoType `send`/`receive`, filePath, capturedAt, capturedBy)
+- **StatusHistory** → `tblStatusHistory` (reqId, fromStatus, toStatus, byEmpCode, changedAt, note) — audit trail
+- **PauseReason / CancelReason** → `tblPauseReason` / `tblCancelReason` (reqId, reason, byEmpCode, at)
 
 ---
 
@@ -259,3 +290,8 @@ Audit trail เต็มรูปแบบ · แจ้งเตือนผ่�
 - **D11 — Messenger:** ✅ แต่ละสาขามี Messenger ประจำคนเดียว, เปลี่ยนตัวกลางคันไม่ได้, `sequenceOrder` เป็นลำดับ**ต่อวัน**
 - **D12 — Test framework:** ✅ **NUnit**
 - **D13 — Dev DB:** ✅ สร้าง `MessengerDb` บน `localhost` (Windows Auth) แล้ว — รายละเอียดดู §2.1
+- **D14 — Naming convention:** ✅ table = `tbl`, view = `vw`, stored procedure = `sp`, function = `fn` — **prefix ติดชื่อเลย ไม่มี underscore** (ดู §2.2)
+- **D15 — ฟิลด์บังคับกรอก:** ✅ `contactName`, `address`, `detail` = บังคับ (NOT NULL + CHECK) · `phone` = ไม่บังคับ
+- **D16 — sendDate ที่ผู้ใช้แก้เอง:** ✅ ห้ามย้อนหลัง + ห้ามเสาร์/อาทิตย์ · กฎเลื่อนเป็นวันจันทร์ของ BR-1 ใช้เฉพาะตอนคำนวณ default
+- **D17 — แจ้งงานแทนคนอื่น:** ✅ ทุก role ทำได้ แต่เลือกได้เฉพาะคนใน **สาขาเดียวกัน** (BR-6) · default = ตัวเอง · `createdBy` บันทึกคนกรอกจริงเสมอ
+- **D18 — ฟอร์มประเภทงาน:** ✅ checkbox 6 ประเภท ติ๊กแล้วมีช่องกรอกรายละเอียดโผล่ต่อแต่ละประเภท

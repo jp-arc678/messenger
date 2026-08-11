@@ -13,33 +13,33 @@ SET QUOTED_IDENTIFIER ON;
 GO
 
 /* =============================================================
-   usp_Branch_List — รายชื่อสาขาที่ยังใช้งาน
+   spBranchList — รายชื่อสาขาที่ยังใช้งาน
    ============================================================= */
-IF OBJECT_ID(N'dbo.usp_Branch_List', N'P') IS NOT NULL
-    DROP PROCEDURE dbo.usp_Branch_List;
+IF OBJECT_ID(N'dbo.spBranchList', N'P') IS NOT NULL
+    DROP PROCEDURE dbo.spBranchList;
 GO
 
-CREATE PROCEDURE dbo.usp_Branch_List
+CREATE PROCEDURE dbo.spBranchList
 AS
 BEGIN
     SET NOCOUNT ON;
 
     SELECT BranchCode, BranchName, IsActive
-    FROM dbo.Branch
+    FROM dbo.tblBranch
     WHERE IsActive = 1
     ORDER BY BranchCode;
 END
 GO
 
 /* =============================================================
-   usp_Employee_GetByEmpCode — ดึงพนักงาน + role ที่ resolve แล้ว
+   spEmployeeGetByEmpCode — ดึงพนักงาน + role ที่ resolve แล้ว
    ใช้ตอน login และตอนสร้าง principal ในแต่ละ request
    ============================================================= */
-IF OBJECT_ID(N'dbo.usp_Employee_GetByEmpCode', N'P') IS NOT NULL
-    DROP PROCEDURE dbo.usp_Employee_GetByEmpCode;
+IF OBJECT_ID(N'dbo.spEmployeeGetByEmpCode', N'P') IS NOT NULL
+    DROP PROCEDURE dbo.spEmployeeGetByEmpCode;
 GO
 
-CREATE PROCEDURE dbo.usp_Employee_GetByEmpCode
+CREATE PROCEDURE dbo.spEmployeeGetByEmpCode
     @EmpCode VARCHAR(20)
 AS
 BEGIN
@@ -47,20 +47,21 @@ BEGIN
 
     SELECT EmpCode, FullName, DeptCode, UnitName, PhoneExt, Email,
            BranchCode, BranchName, RoleCode, IsActive
-    FROM dbo.vw_EmployeeRole
+    FROM dbo.vwEmployeeRole
     WHERE EmpCode = @EmpCode;
 END
 GO
 
 /* =============================================================
-   usp_Employee_ListByBranch — รายชื่อพนักงาน (ใช้กับหน้า mock login
-   และ master data ภายหลัง)  @BranchCode = NULL คือทุกสาขา
+   spEmployeeListByBranch — รายชื่อพนักงาน (ใช้กับหน้า mock login,
+   การเลือกผู้แจ้งแทนคนอื่นตาม D17 และ master data ภายหลัง)
+   @BranchCode = NULL คือทุกสาขา
    ============================================================= */
-IF OBJECT_ID(N'dbo.usp_Employee_ListByBranch', N'P') IS NOT NULL
-    DROP PROCEDURE dbo.usp_Employee_ListByBranch;
+IF OBJECT_ID(N'dbo.spEmployeeListByBranch', N'P') IS NOT NULL
+    DROP PROCEDURE dbo.spEmployeeListByBranch;
 GO
 
-CREATE PROCEDURE dbo.usp_Employee_ListByBranch
+CREATE PROCEDURE dbo.spEmployeeListByBranch
     @BranchCode CHAR(3) = NULL
 AS
 BEGIN
@@ -68,7 +69,7 @@ BEGIN
 
     SELECT EmpCode, FullName, DeptCode, UnitName, PhoneExt, Email,
            BranchCode, BranchName, RoleCode, IsActive
-    FROM dbo.vw_EmployeeRole
+    FROM dbo.vwEmployeeRole
     WHERE IsActive = 1
       AND (@BranchCode IS NULL OR BranchCode = @BranchCode)
     ORDER BY BranchCode, RoleCode, EmpCode;
@@ -76,17 +77,17 @@ END
 GO
 
 /* =============================================================
-   usp_Employee_UpsertFromSso — cache ข้อมูลพนักงานจาก SSO (BR-7)
+   spEmployeeUpsertFromSso — cache ข้อมูลพนักงานจาก SSO (BR-7)
    เรียกทุกครั้งที่ login สำเร็จ
-   D10 : คนใหม่ที่ยังไม่มี role → ใส่แถว UserRole เป็น 'U' ให้ทันที
+   D10 : คนใหม่ที่ยังไม่มี role → ใส่แถว tblUserRole เป็น 'U' ให้ทันที
    หมายเหตุ : ไม่แตะ RoleCode ของคนที่มีอยู่แล้ว (role มาจากระบบเรา
               ไม่ได้มาจาก SSO)
    ============================================================= */
-IF OBJECT_ID(N'dbo.usp_Employee_UpsertFromSso', N'P') IS NOT NULL
-    DROP PROCEDURE dbo.usp_Employee_UpsertFromSso;
+IF OBJECT_ID(N'dbo.spEmployeeUpsertFromSso', N'P') IS NOT NULL
+    DROP PROCEDURE dbo.spEmployeeUpsertFromSso;
 GO
 
-CREATE PROCEDURE dbo.usp_Employee_UpsertFromSso
+CREATE PROCEDURE dbo.spEmployeeUpsertFromSso
     @EmpCode    VARCHAR(20),
     @FullName   NVARCHAR(200),
     @DeptCode   VARCHAR(20)   = NULL,
@@ -101,9 +102,9 @@ BEGIN
 
     BEGIN TRANSACTION;
 
-    IF EXISTS (SELECT 1 FROM dbo.Employee WHERE EmpCode = @EmpCode)
+    IF EXISTS (SELECT 1 FROM dbo.tblEmployee WHERE EmpCode = @EmpCode)
     BEGIN
-        UPDATE dbo.Employee
+        UPDATE dbo.tblEmployee
         SET FullName   = @FullName,
             DeptCode   = @DeptCode,
             UnitName   = @UnitName,
@@ -116,20 +117,20 @@ BEGIN
     END
     ELSE
     BEGIN
-        INSERT INTO dbo.Employee (EmpCode, FullName, DeptCode, UnitName, PhoneExt, Email, BranchCode)
+        INSERT INTO dbo.tblEmployee (EmpCode, FullName, DeptCode, UnitName, PhoneExt, Email, BranchCode)
         VALUES (@EmpCode, @FullName, @DeptCode, @UnitName, @PhoneExt, @Email, @BranchCode);
     END
 
     -- คนใหม่เริ่มที่ U-User เสมอ (D10)
-    IF NOT EXISTS (SELECT 1 FROM dbo.UserRole WHERE EmpCode = @EmpCode)
+    IF NOT EXISTS (SELECT 1 FROM dbo.tblUserRole WHERE EmpCode = @EmpCode)
     BEGIN
-        INSERT INTO dbo.UserRole (EmpCode, BranchCode, RoleCode, CreatedBy)
+        INSERT INTO dbo.tblUserRole (EmpCode, BranchCode, RoleCode, CreatedBy)
         VALUES (@EmpCode, @BranchCode, 'U', N'SSO');
     END
     ELSE
     BEGIN
         -- ย้ายสาขา : sync BranchCode ของ role ให้ตรงกับ SSO เสมอ (BR-6)
-        UPDATE dbo.UserRole
+        UPDATE dbo.tblUserRole
         SET BranchCode = @BranchCode,
             UpdatedBy  = N'SSO',
             UpdatedAt  = SYSDATETIME()
@@ -142,7 +143,7 @@ BEGIN
     -- คืนข้อมูลที่ resolve แล้วกลับไปให้ service layer
     SELECT EmpCode, FullName, DeptCode, UnitName, PhoneExt, Email,
            BranchCode, BranchName, RoleCode, IsActive
-    FROM dbo.vw_EmployeeRole
+    FROM dbo.vwEmployeeRole
     WHERE EmpCode = @EmpCode;
 END
 GO

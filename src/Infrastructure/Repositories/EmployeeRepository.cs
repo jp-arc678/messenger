@@ -30,7 +30,7 @@ namespace Messenger.Infrastructure.Repositories
             using (var connection = _connectionFactory.CreateConnection())
             {
                 var row = connection.QuerySingleOrDefault<EmployeeRow>(
-                    "dbo.usp_Employee_GetByEmpCode",
+                    "dbo.spEmployeeGetByEmpCode",
                     new { EmpCode = empCode.Trim() },
                     commandType: CommandType.StoredProcedure);
 
@@ -46,7 +46,7 @@ namespace Messenger.Infrastructure.Repositories
             using (var connection = _connectionFactory.CreateConnection())
             {
                 var row = connection.QuerySingleOrDefault<EmployeeRow>(
-                    "dbo.usp_Employee_UpsertFromSso",
+                    "dbo.spEmployeeUpsertFromSso",
                     new
                     {
                         EmpCode = info.EmpCode,
@@ -68,7 +68,7 @@ namespace Messenger.Infrastructure.Repositories
             using (var connection = _connectionFactory.CreateConnection())
             {
                 var rows = connection.Query<EmployeeRow>(
-                    "dbo.usp_Employee_ListByBranch",
+                    "dbo.spEmployeeListByBranch",
                     new { BranchCode = string.IsNullOrWhiteSpace(branchCode) ? null : branchCode.Trim() },
                     commandType: CommandType.StoredProcedure);
 

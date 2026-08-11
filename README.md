@@ -41,14 +41,10 @@ foreach ($f in Get-ChildItem src\Database\*.sql | Sort-Object Name) {
 ได้ database `MessengerDb` (collation `Thai_CI_AS`, compatibility level 120 = SQL Server 2014)
 แก้ connection string ได้ที่ [src/Web/Web.config](src/Web/Web.config)
 
-### 2. Bootstrap
-
-ไฟล์ Bootstrap 5.3.3 ถูก commit ไว้ในรีโปแล้ว (ไม่ใช้ CDN เพราะเป็นระบบ intranet) ไม่ต้องทำอะไรเพิ่ม
-
-ถ้าจะอัปเกรดเวอร์ชัน:
+### 2. ดาวน์โหลด Bootstrap (ไม่ใช้ CDN เพราะเป็นระบบ intranet)
 
 ```powershell
-pwsh -File tools\Get-Bootstrap.ps1 -Version 5.3.4
+pwsh -File tools\Get-Bootstrap.ps1
 ```
 
 ---

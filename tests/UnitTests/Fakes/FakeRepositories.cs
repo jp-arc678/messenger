@@ -28,7 +28,7 @@ namespace Messenger.UnitTests.Fakes
     }
 
     /// <summary>
-    /// พนักงานปลอมที่จำลองพฤติกรรมของ usp_Employee_UpsertFromSso :
+    /// พนักงานปลอมที่จำลองพฤติกรรมของ spEmployeeUpsertFromSso :
     /// คนที่ยังไม่เคยมี role จะได้ 'U' ตาม D10
     /// </summary>
     public class FakeEmployeeRepository : IEmployeeRepository
