@@ -1,0 +1,18 @@
+@model string
+@{
+    ViewBag.Title = "ไม่พบใบแจ้งงาน";
+}
+
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-body p-4 text-center">
+                <h1 class="h5 mb-2">ไม่พบใบแจ้งงาน</h1>
+                <p class="text-body-secondary">
+                    @(string.IsNullOrEmpty(Model) ? "ไม่พบใบแจ้งงานที่ต้องการ" : Model)
+                </p>
+                <a class="btn btn-primary" href="@Url.Action("Index", "Requests")">กลับไปรายการใบแจ้งงาน</a>
+            </div>
+        </div>
+    </div>
+</div>

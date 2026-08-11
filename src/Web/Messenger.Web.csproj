@@ -83,6 +83,7 @@
     <Compile Include="Controllers\AccountController.cs" />
     <Compile Include="Controllers\BaseController.cs" />
     <Compile Include="Controllers\HomeController.cs" />
+    <Compile Include="Controllers\RequestsController.cs" />
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
@@ -90,6 +91,8 @@
     <Compile Include="Security\MessengerPrincipal.cs" />
     <Compile Include="Security\UserContextTicket.cs" />
     <Compile Include="ViewModels\LoginViewModel.cs" />
+    <Compile Include="ViewModels\RequestFormViewModel.cs" />
+    <Compile Include="ViewModels\RequestListViewModel.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -98,11 +101,18 @@
     <Content Include="Content\bootstrap.min.css" />
     <Content Include="Content\site.css" />
     <Content Include="Scripts\bootstrap.bundle.min.js" />
+    <Content Include="Scripts\request-form.js" />
     <Content Include="Views\web.config" />
     <Content Include="Views\_ViewStart.cshtml" />
     <Content Include="Views\Shared\_Layout.cshtml" />
+    <Content Include="Views\Shared\RequestNotFound.cshtml" />
     <Content Include="Views\Account\Login.cshtml" />
     <Content Include="Views\Home\Index.cshtml" />
+    <Content Include="Views\Requests\Index.cshtml" />
+    <Content Include="Views\Requests\Details.cshtml" />
+    <Content Include="Views\Requests\Create.cshtml" />
+    <Content Include="Views\Requests\Edit.cshtml" />
+    <Content Include="Views\Requests\_Form.cshtml" />
   </ItemGroup>
 
   <PropertyGroup>

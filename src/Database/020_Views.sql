@@ -40,5 +40,47 @@ LEFT JOIN dbo.tblUserRole AS ur
         ON ur.EmpCode = e.EmpCode;
 GO
 
+/* ---------- vwDeliveryRequest ----------
+   ใบแจ้งงาน + ชื่อสาขา + ข้อมูลผู้แจ้ง (join ไว้ให้แล้ว)
+   ทุก query ที่ใช้ view นี้ "ต้อง" มี WHERE BranchCode เสมอ ตาม BR-6
+   --------------------------------------- */
+IF OBJECT_ID(N'dbo.vwDeliveryRequest', N'V') IS NOT NULL
+    DROP VIEW dbo.vwDeliveryRequest;
+GO
+
+CREATE VIEW dbo.vwDeliveryRequest
+AS
+SELECT
+    r.ReqId,
+    r.ReqNo,
+    r.BranchCode,
+    b.BranchName,
+    r.RequesterEmpCode,
+    e.FullName   AS RequesterName,
+    e.DeptCode   AS RequesterDeptCode,
+    e.UnitName   AS RequesterUnitName,
+    e.PhoneExt   AS RequesterPhoneExt,
+    e.Email      AS RequesterEmail,
+    r.RequestDateTime,
+    r.SendDate,
+    r.ContactName,
+    r.Address,
+    r.Phone,
+    r.Detail,
+    r.Status,
+    r.IsPersonal,
+    r.ReceiptConfirmed,
+    r.[RowVersion],
+    r.CreatedBy,
+    r.CreatedAt,
+    r.UpdatedBy,
+    r.UpdatedAt
+FROM dbo.tblDeliveryRequest AS r
+INNER JOIN dbo.tblBranch AS b
+        ON b.BranchCode = r.BranchCode
+INNER JOIN dbo.tblEmployee AS e
+        ON e.EmpCode = r.RequesterEmpCode;
+GO
+
 PRINT '--- 020_Views.sql completed ---';
 GO

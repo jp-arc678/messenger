@@ -46,15 +46,16 @@
             </div>
         </div>
 
+        <div class="d-flex gap-2 mb-4">
+            <a class="btn btn-primary" href="@Url.Action("Create", "Requests")">แจ้งงานใหม่</a>
+            <a class="btn btn-outline-primary" href="@Url.Action("Index", "Requests")">ดูใบแจ้งงาน</a>
+        </div>
+
         <div class="alert alert-secondary mb-0" role="alert">
             <h2 class="h6">สถานะโปรเจกต์</h2>
-            <p class="mb-1 small">
-                ขณะนี้อยู่ที่ <strong>Phase 0 — Foundation</strong> จึงยังไม่มีเมนูใบแจ้งงาน
-                หน้านี้มีไว้ยืนยันว่าโครงระบบ, การ login ผ่าน SSO จำลอง,
-                การ resolve สิทธิ์ และการระบุสาขา ทำงานได้ถูกต้อง
-            </p>
             <p class="mb-0 small">
-                ฟอร์มแจ้งงานจะเริ่มทำใน Phase 1
+                ขณะนี้อยู่ที่ <strong>Phase 1 — ฟอร์มแจ้งงาน</strong> สร้าง/แก้ไข/ดูใบแจ้งงานได้แล้ว
+                ส่วนคิวงานของ Messenger การยืนยันรับงาน และการเปลี่ยนสถานะ จะเริ่มทำใน Phase 2
             </p>
         </div>
 

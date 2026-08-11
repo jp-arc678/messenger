@@ -1,0 +1,223 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web.Mvc;
+using Messenger.Application.Services;
+using Messenger.Domain.Entities;
+using Messenger.Web.ViewModels;
+
+namespace Messenger.Web.Controllers
+{
+    /// <summary>
+    /// ใบแจ้งงาน — สร้าง / แก้ไข / ดู / รายการ
+    ///
+    /// Controller ไม่มี business rule เลย หน้าที่มีแค่
+    /// แปลงฟอร์ม → command → เรียก service → แปลงผลลัพธ์เป็นหน้าจอ
+    /// การตัดสินสิทธิ์ สาขา และความถูกต้องทั้งหมดอยู่ที่ service layer
+    /// </summary>
+    public class RequestsController : BaseController
+    {
+        private readonly IDeliveryRequestService _service;
+
+        public RequestsController(IDeliveryRequestService service)
+        {
+            _service = service ?? throw new ArgumentNullException(nameof(service));
+        }
+
+        [HttpGet]
+        public ActionResult Index(string sendDateFrom, string sendDateTo)
+        {
+            var from = RequestFormViewModel.ParseDate(sendDateFrom);
+            var to = RequestFormViewModel.ParseDate(sendDateTo);
+
+            var model = new RequestListViewModel
+            {
+                Requests = _service.List(CurrentUser, from, to),
+                SendDateFrom = sendDateFrom,
+                SendDateTo = sendDateTo,
+                SeesWholeBranch = CurrentUser.IsAdmin || CurrentUser.IsMessenger,
+                BranchCode = CurrentUser.BranchCode,
+                BranchName = CurrentUser.BranchName,
+                Message = TempData["Message"] as string
+            };
+
+            return View(model);
+        }
+
+        [HttpGet]
+        public ActionResult Details(int id)
+        {
+            var result = _service.Get(id, CurrentUser);
+            if (!result.Success)
+                return HttpNotFoundWithMessage(result.FirstError);
+
+            ViewBag.CanEdit = _service.CanEdit(result.Value, CurrentUser);
+            return View(result.Value);
+        }
+
+        [HttpGet]
+        public ActionResult Create()
+        {
+            var model = new RequestFormViewModel
+            {
+                RequesterEmpCode = CurrentUser.EmpCode,
+                SendDate = RequestFormViewModel.FormatDate(_service.GetDefaultSendDate()),
+                JobTypes = RequestFormViewModel.BuildEmptyJobTypes(),
+                SelectableRequesters = _service.GetSelectableRequesters(CurrentUser)
+            };
+
+            return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public ActionResult Create(RequestFormViewModel form)
+        {
+            NormalizeForm(form);
+
+            var sendDate = RequestFormViewModel.ParseDate(form.SendDate);
+            if (sendDate == null)
+                return RedisplayCreate(form, "รูปแบบวันที่ส่งไม่ถูกต้อง");
+
+            var command = new CreateRequestCommand
+            {
+                RequesterEmpCode = form.RequesterEmpCode,
+                SendDate = sendDate,
+                ContactName = form.ContactName,
+                Address = form.Address,
+                Phone = form.Phone,
+                Detail = form.Detail,
+                IsPersonal = form.IsPersonal,
+                JobTypes = form.ToJobTypeInputs()
+            };
+
+            var result = _service.Create(command, CurrentUser);
+            if (!result.Success)
+                return RedisplayCreate(form, result.Errors);
+
+            TempData["Message"] = $"สร้างใบแจ้งงาน {result.Value.ReqNo} เรียบร้อยแล้ว";
+            return RedirectToAction("Details", new { id = result.Value.ReqId });
+        }
+
+        [HttpGet]
+        public ActionResult Edit(int id)
+        {
+            var result = _service.Get(id, CurrentUser);
+            if (!result.Success)
+                return HttpNotFoundWithMessage(result.FirstError);
+
+            var request = result.Value;
+
+            if (!_service.CanEdit(request, CurrentUser))
+            {
+                TempData["Message"] = "ใบแจ้งงานนี้แก้ไขไม่ได้แล้ว";
+                return RedirectToAction("Details", new { id });
+            }
+
+            return View(ToForm(request));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public ActionResult Edit(RequestFormViewModel form)
+        {
+            NormalizeForm(form);
+
+            var sendDate = RequestFormViewModel.ParseDate(form.SendDate);
+            if (sendDate == null)
+                return RedisplayEdit(form, "รูปแบบวันที่ส่งไม่ถูกต้อง");
+
+            var command = new UpdateRequestCommand
+            {
+                ReqId = form.ReqId,
+                RequesterEmpCode = form.RequesterEmpCode,
+                SendDate = sendDate.Value,
+                ContactName = form.ContactName,
+                Address = form.Address,
+                Phone = form.Phone,
+                Detail = form.Detail,
+                IsPersonal = form.IsPersonal,
+                RowVersion = form.RowVersionBytes(),
+                JobTypes = form.ToJobTypeInputs()
+            };
+
+            var result = _service.Update(command, CurrentUser);
+            if (!result.Success)
+                return RedisplayEdit(form, result.Errors);
+
+            TempData["Message"] = $"บันทึกการแก้ไขใบแจ้งงาน {result.Value.ReqNo} เรียบร้อยแล้ว";
+            return RedirectToAction("Details", new { id = form.ReqId });
+        }
+
+        // ---------------- helpers ----------------
+
+        private RequestFormViewModel ToForm(DeliveryRequest request)
+        {
+            return new RequestFormViewModel
+            {
+                ReqId = request.ReqId,
+                ReqNo = request.ReqNo,
+                RowVersion = request.RowVersion == null ? null : Convert.ToBase64String(request.RowVersion),
+                RequesterEmpCode = request.RequesterEmpCode,
+                SendDate = RequestFormViewModel.FormatDate(request.SendDate),
+                ContactName = request.ContactName,
+                Address = request.Address,
+                Phone = request.Phone,
+                Detail = request.Detail,
+                IsPersonal = request.IsPersonal,
+                JobTypes = RequestFormViewModel.BuildJobTypesFrom(request.JobTypes),
+                SelectableRequesters = _service.GetSelectableRequesters(CurrentUser),
+                StatusDisplayName = request.StatusDisplayName
+            };
+        }
+
+        /// <summary>
+        /// ฟอร์มที่ POST กลับมาจะไม่มีข้อมูลประกอบหน้าจอ (รายชื่อผู้แจ้ง, ช่อง checkbox ที่ไม่ได้ติ๊ก)
+        /// จึงต้องเติมกลับก่อนแสดงผลซ้ำ
+        /// </summary>
+        private void NormalizeForm(RequestFormViewModel form)
+        {
+            if (form.JobTypes == null || form.JobTypes.Count == 0)
+                form.JobTypes = RequestFormViewModel.BuildEmptyJobTypes();
+        }
+
+        private ActionResult RedisplayCreate(RequestFormViewModel form, params string[] errors)
+        {
+            return RedisplayCreate(form, (IReadOnlyList<string>)errors);
+        }
+
+        private ActionResult RedisplayCreate(RequestFormViewModel form, IReadOnlyList<string> errors)
+        {
+            form.Errors = errors;
+            form.SelectableRequesters = _service.GetSelectableRequesters(CurrentUser);
+            return View("Create", form);
+        }
+
+        private ActionResult RedisplayEdit(RequestFormViewModel form, params string[] errors)
+        {
+            return RedisplayEdit(form, (IReadOnlyList<string>)errors);
+        }
+
+        private ActionResult RedisplayEdit(RequestFormViewModel form, IReadOnlyList<string> errors)
+        {
+            form.Errors = errors;
+            form.SelectableRequesters = _service.GetSelectableRequesters(CurrentUser);
+
+            // ดึงสถานะล่าสุดมาแสดงหัวฟอร์ม (ถ้ายังอ่านได้)
+            var current = _service.Get(form.ReqId, CurrentUser);
+            if (current.Success)
+            {
+                form.ReqNo = current.Value.ReqNo;
+                form.StatusDisplayName = current.Value.StatusDisplayName;
+            }
+
+            return View("Edit", form);
+        }
+
+        private ActionResult HttpNotFoundWithMessage(string message)
+        {
+            Response.StatusCode = 404;
+            return View("RequestNotFound", model: message);
+        }
+    }
+}

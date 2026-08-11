@@ -1,0 +1,89 @@
+@model RequestListViewModel
+@{
+    ViewBag.Title = "ใบแจ้งงาน";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="h4 mb-1">ใบแจ้งงาน</h1>
+        <div class="text-body-secondary small">
+            สาขา @Model.BranchCode — @Model.BranchName ·
+            @(Model.SeesWholeBranch ? "เห็นใบงานทั้งสาขา" : "เห็นเฉพาะใบที่คุณเป็นผู้แจ้ง")
+        </div>
+    </div>
+    <a class="btn btn-primary" href="@Url.Action("Create")">+ แจ้งงานใหม่</a>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.Message))
+{
+    <div class="alert alert-success" role="alert">@Model.Message</div>
+}
+
+<form method="get" class="card card-body mb-3">
+    <div class="row g-2 align-items-end">
+        <div class="col-12 col-sm-4 col-lg-3">
+            <label class="form-label" for="sendDateFrom">วันที่ส่ง ตั้งแต่</label>
+            <input type="date" class="form-control" id="sendDateFrom" name="sendDateFrom" value="@Model.SendDateFrom" />
+        </div>
+        <div class="col-12 col-sm-4 col-lg-3">
+            <label class="form-label" for="sendDateTo">ถึง</label>
+            <input type="date" class="form-control" id="sendDateTo" name="sendDateTo" value="@Model.SendDateTo" />
+        </div>
+        <div class="col-12 col-sm-4 col-lg-3 d-flex gap-2">
+            <button type="submit" class="btn btn-outline-primary">ค้นหา</button>
+            <a class="btn btn-outline-secondary" href="@Url.Action("Index")">ล้าง</a>
+        </div>
+    </div>
+</form>
+
+@if (Model.Requests.Count == 0)
+{
+    <div class="alert alert-secondary mb-0" role="alert">
+        ยังไม่มีใบแจ้งงานที่ตรงกับเงื่อนไข
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle bg-white">
+            <thead>
+                <tr>
+                    <th scope="col">เลขใบงาน</th>
+                    <th scope="col">วันที่ส่ง</th>
+                    <th scope="col">ผู้ติดต่อ</th>
+                    @if (Model.SeesWholeBranch)
+                    {
+                        <th scope="col">ผู้แจ้ง</th>
+                    }
+                    <th scope="col">สถานะ</th>
+                    <th scope="col" class="text-end">ดู</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var request in Model.Requests)
+                {
+                    <tr>
+                        <td>
+                            <code>@request.ReqNo</code>
+                            @if (request.IsPersonal)
+                            {
+                                <span class="badge text-bg-light ms-1">ส่วนตัว</span>
+                            }
+                        </td>
+                        <td>@request.SendDate.ToString("dd/MM/yyyy")</td>
+                        <td>@request.ContactName</td>
+                        @if (Model.SeesWholeBranch)
+                        {
+                            <td>@request.RequesterName</td>
+                        }
+                        <td><span class="badge text-bg-secondary">@request.StatusDisplayName</span></td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary"
+                               href="@Url.Action("Details", new { id = request.ReqId })">รายละเอียด</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

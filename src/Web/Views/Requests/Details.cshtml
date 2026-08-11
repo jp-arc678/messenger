@@ -1,0 +1,130 @@
+@model Messenger.Domain.Entities.DeliveryRequest
+@{
+    ViewBag.Title = "รายละเอียดใบแจ้งงาน";
+    var canEdit = ViewBag.CanEdit != null && (bool)ViewBag.CanEdit;
+    var message = TempData["Message"] as string;
+}
+
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-9">
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="alert alert-success" role="alert">@message</div>
+        }
+
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <div>
+                <h1 class="h4 mb-1">@Model.ReqNo</h1>
+                <span class="badge text-bg-secondary">@Model.StatusDisplayName</span>
+                <span class="badge text-bg-primary">สาขา @Model.BranchCode</span>
+                @if (Model.IsPersonal)
+                {
+                    <span class="badge text-bg-light">งานฝากส่วนตัว</span>
+                }
+            </div>
+            <div class="d-flex gap-2">
+                <a class="btn btn-outline-secondary" href="@Url.Action("Index")">กลับไปรายการ</a>
+                @if (canEdit)
+                {
+                    <a class="btn btn-primary" href="@Url.Action("Edit", new { id = Model.ReqId })">แก้ไข</a>
+                }
+            </div>
+        </div>
+
+        @if (!canEdit)
+        {
+            <div class="alert alert-secondary small" role="alert">
+                ใบแจ้งงานนี้แก้ไขไม่ได้ — แก้ได้เฉพาะใบที่ตัวเองเป็นผู้แจ้ง และต้องอยู่ในสถานะ
+                &quot;รับแจ้ง&quot; เท่านั้น (ผู้ดูแลระบบของสาขาแก้ได้ทุกสถานะ)
+            </div>
+        }
+
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold">ประเภทงาน</div>
+            <div class="card-body">
+                @if (Model.JobTypes == null || Model.JobTypes.Count == 0)
+                {
+                    <div class="text-body-secondary">ไม่มีข้อมูล</div>
+                }
+                else
+                {
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var jobType in Model.JobTypes)
+                        {
+                            <li class="mb-1">
+                                <span class="badge text-bg-info">@jobType.JobTypeDisplayName</span>
+                                @if (!string.IsNullOrWhiteSpace(jobType.DetailText))
+                                {
+                                    <span class="ms-1">@jobType.DetailText</span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold">ข้อมูลการส่ง</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 col-lg-3">วันที่ส่ง</dt>
+                    <dd class="col-sm-8 col-lg-9">@Model.SendDate.ToString("dd/MM/yyyy")</dd>
+
+                    <dt class="col-sm-4 col-lg-3">ผู้ติดต่อ</dt>
+                    <dd class="col-sm-8 col-lg-9">@Model.ContactName</dd>
+
+                    <dt class="col-sm-4 col-lg-3">เบอร์โทร</dt>
+                    <dd class="col-sm-8 col-lg-9">@(string.IsNullOrWhiteSpace(Model.Phone) ? "-" : Model.Phone)</dd>
+
+                    <dt class="col-sm-4 col-lg-3">ที่อยู่</dt>
+                    <dd class="col-sm-8 col-lg-9" style="white-space: pre-line;">@Model.Address</dd>
+
+                    <dt class="col-sm-4 col-lg-3">รายละเอียดงาน</dt>
+                    <dd class="col-sm-8 col-lg-9" style="white-space: pre-line;">@Model.Detail</dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-semibold">ข้อมูลผู้แจ้ง</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 col-lg-3">ผู้แจ้ง</dt>
+                    <dd class="col-sm-8 col-lg-9">
+                        @Model.RequesterName <code class="ms-1">@Model.RequesterEmpCode</code>
+                    </dd>
+
+                    <dt class="col-sm-4 col-lg-3">หน่วยงาน</dt>
+                    <dd class="col-sm-8 col-lg-9">@Model.RequesterUnitName</dd>
+
+                    <dt class="col-sm-4 col-lg-3">เบอร์ภายใน</dt>
+                    <dd class="col-sm-8 col-lg-9">@Model.RequesterPhoneExt</dd>
+
+                    <dt class="col-sm-4 col-lg-3">อีเมล</dt>
+                    <dd class="col-sm-8 col-lg-9">@Model.RequesterEmail</dd>
+
+                    <dt class="col-sm-4 col-lg-3">บันทึกเมื่อ</dt>
+                    <dd class="col-sm-8 col-lg-9">
+                        @Model.RequestDateTime.ToString("dd/MM/yyyy HH:mm")
+                        @if (Model.CreatedBy != Model.RequesterEmpCode)
+                        {
+                            <span class="text-body-secondary">(บันทึกโดย @Model.CreatedBy)</span>
+                        }
+                    </dd>
+
+                    @if (Model.UpdatedAt.HasValue)
+                    {
+                        <dt class="col-sm-4 col-lg-3">แก้ไขล่าสุด</dt>
+                        <dd class="col-sm-8 col-lg-9">
+                            @Model.UpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")
+                            <span class="text-body-secondary">โดย @Model.UpdatedBy</span>
+                        </dd>
+                    }
+                </dl>
+            </div>
+        </div>
+
+    </div>
+</div>

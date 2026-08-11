@@ -28,23 +28,31 @@ namespace Messenger.Web.Composition
             IDbConnectionFactory connectionFactory = new SqlConnectionFactory(connectionString);
             IEmployeeRepository employees = new EmployeeRepository(connectionFactory);
             IBranchRepository branches = new BranchRepository(connectionFactory);
+            IDeliveryRequestRepository requests = new DeliveryRequestRepository(connectionFactory);
 
             // D3 — SSO ยังเป็น stub ในเฟส 0 เมื่อได้ contract จริงให้สลับบรรทัดนี้บรรทัดเดียว
             ISsoClient sso = new MockSsoClient();
 
+            IClock clock = new SystemClock();
+
             IAuthService authService = new AuthService(sso, employees, branches);
+            IDeliveryRequestService requestService = new DeliveryRequestService(requests, employees, clock);
 
             var factories = new Dictionary<Type, Func<object>>
             {
                 { typeof(IDbConnectionFactory), () => connectionFactory },
                 { typeof(IEmployeeRepository), () => employees },
                 { typeof(IBranchRepository), () => branches },
+                { typeof(IDeliveryRequestRepository), () => requests },
                 { typeof(ISsoClient), () => sso },
+                { typeof(IClock), () => clock },
                 { typeof(IAuthService), () => authService },
+                { typeof(IDeliveryRequestService), () => requestService },
 
                 // controller ที่มี dependency ต้องลงทะเบียนไว้
                 // (controller ที่ไม่มี dependency ปล่อยให้ MVC สร้างเองได้)
-                { typeof(AccountController), () => new AccountController(authService) }
+                { typeof(AccountController), () => new AccountController(authService) },
+                { typeof(RequestsController), () => new RequestsController(requestService) }
             };
 
             return new MessengerDependencyResolver(factories);

@@ -1,0 +1,45 @@
+@model RequestFormViewModel
+@{
+    ViewBag.Title = "แก้ไขใบแจ้งงาน";
+}
+
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-9">
+
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <div>
+                <h1 class="h4 mb-1">แก้ไขใบแจ้งงาน</h1>
+                <div class="text-body-secondary small">
+                    <code>@Model.ReqNo</code>
+                    @if (!string.IsNullOrEmpty(Model.StatusDisplayName))
+                    {
+                        <span class="badge text-bg-secondary ms-1">@Model.StatusDisplayName</span>
+                    }
+                </div>
+            </div>
+            <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("Details", new { id = Model.ReqId })">
+                กลับไปหน้ารายละเอียด
+            </a>
+        </div>
+
+        @using (Html.BeginForm("Edit", "Requests", FormMethod.Post, new { autocomplete = "off" }))
+        {
+            @Html.AntiForgeryToken()
+
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    @Html.Partial("_Form", Model)
+                </div>
+                <div class="card-footer bg-white d-flex gap-2 justify-content-end py-3">
+                    <a class="btn btn-outline-secondary" href="@Url.Action("Details", new { id = Model.ReqId })">ยกเลิก</a>
+                    <button type="submit" class="btn btn-primary">บันทึกการแก้ไข</button>
+                </div>
+            </div>
+        }
+
+    </div>
+</div>
+
+@section scripts {
+    <script src="@Url.Content("~/Scripts/request-form.js")"></script>
+}

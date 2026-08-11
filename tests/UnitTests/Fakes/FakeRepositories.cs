@@ -48,6 +48,26 @@ namespace Messenger.UnitTests.Fakes
             return this;
         }
 
+        /// <summary>ใส่พนักงานที่ "มีอยู่แล้วใน DB" ใช้ทดสอบการเลือกผู้แจ้งแทนคนอื่น (D17)</summary>
+        public FakeEmployeeRepository WithEmployee(string empCode, string branchCode,
+                                                   string roleCode = "U", bool isActive = true)
+        {
+            _roleCodes[empCode] = roleCode;
+            _employees[empCode] = new Employee
+            {
+                EmpCode = empCode,
+                FullName = "พนักงาน " + empCode,
+                DeptCode = "TST",
+                UnitName = "ฝ่ายทดสอบ",
+                BranchCode = branchCode,
+                BranchName = "สาขา " + branchCode,
+                Role = RoleCodes.Parse(roleCode),
+                IsActive = isActive
+            };
+
+            return this;
+        }
+
         public Employee GetByEmpCode(string empCode)
         {
             return _employees.TryGetValue(empCode ?? string.Empty, out var employee) ? employee : null;

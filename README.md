@@ -4,7 +4,13 @@
 
 > ข้อกำหนด business rule ทั้งหมดอยู่ใน [CLAUDE.md](CLAUDE.md) — อ่านไฟล์นั้นก่อนแก้โค้ด
 
-**สถานะปัจจุบัน: Phase 0 — Foundation**
+**สถานะปัจจุบัน: Phase 1 — ฟอร์มแจ้งงาน (User)**
+
+| เฟส | สถานะ |
+|---|---|
+| Phase 0 — Foundation (โครงโปรเจกต์ + DB + auth 3 roles + SSO stub) | ✅ เสร็จ |
+| Phase 1 — ฟอร์มแจ้งงาน (สร้าง/แก้/ดู, BR-1, BR-2, BR-8) | ✅ เสร็จ — รอ approval |
+| Phase 2 — Messenger workflow | ⬜ ยังไม่เริ่ม |
 
 ---
 
@@ -34,9 +40,12 @@
 
 ```powershell
 foreach ($f in Get-ChildItem src\Database\*.sql | Sort-Object Name) {
-    sqlcmd -S localhost -E -b -i $f.FullName
+    sqlcmd -S localhost -E -b -f 65001 -i $f.FullName
 }
 ```
+
+> ต้องมี `-f 65001` เสมอ — ไฟล์ `.sql` เป็น UTF-8 แต่ `sqlcmd` จะอ่านด้วย codepage
+> ของ Windows ถ้าไม่บอก ทำให้ข้อความไทยใน seed data เพี้ยน
 
 ได้ database `MessengerDb` (collation `Thai_CI_AS`, compatibility level 120 = SQL Server 2014)
 แก้ connection string ได้ที่ [src/Web/Web.config](src/Web/Web.config)
@@ -69,6 +78,50 @@ $msb = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\C
 ```powershell
 dotnet test tests\UnitTests\Messenger.UnitTests.csproj
 ```
+
+## ตรวจทั้งหมดในคำสั่งเดียว
+
+`Verify.ps1` รัน SQL scripts → build → unit test ให้ครบตามลำดับ (รันซ้ำได้เสมอ):
+
+```powershell
+pwsh -File tools\Verify.ps1
+```
+
+ถ้าสงสัยว่าใบงานลง DB จริงไหม / stored procedure คืนอะไร ใช้:
+
+```powershell
+pwsh -File tools\Diag-Requests.ps1
+```
+
+---
+
+## สิ่งที่ใช้งานได้ตอนนี้ (Phase 1)
+
+เมนู **ใบแจ้งงาน** และ **แจ้งงานใหม่** บน navbar (`/Requests`)
+
+| หน้า | ทำอะไรได้ |
+|---|---|
+| `/Requests` | รายการใบงาน + กรองตามช่วง **วันที่ส่ง** · Admin/Messenger เห็นทั้งสาขา ส่วน User เห็นเฉพาะใบตัวเอง (§5 + BR-6) |
+| `/Requests/Create` | สร้างใบงาน — เลือกผู้แจ้งแทนคนอื่นได้เฉพาะคนในสาขาเดียวกัน (D17), ติ๊กประเภทงาน 6 แบบพร้อมช่องรายละเอียดต่ออัน (D18) |
+| `/Requests/Details/{id}` | ดูใบงาน + ปุ่มแก้ไขจะโผล่เฉพาะเมื่อมีสิทธิ์จริงตาม BR-2 |
+| `/Requests/Edit/{id}` | แก้ใบงาน — ล็อกตาม BR-2 และกันแก้ชนกันด้วย rowVersion (optimistic locking) |
+
+Business rule ที่บังคับแล้วที่ **service layer**:
+
+- **BR-1** — sendDate default: เกิน 10:00 → วันถัดไป, ตกเสาร์/อาทิตย์ → เลื่อนเป็นจันทร์
+- **D16** — sendDate ที่ผู้ใช้เลือกเอง: ห้ามย้อนหลัง ห้ามเสาร์/อาทิตย์
+- **BR-2** — User เจ้าของแก้ได้เฉพาะสถานะ `Received`, Admin แก้ได้ทุกสถานะ
+- **BR-6** — filter ตาม branchCode ทุก query
+- **BR-8** — เลขใบงาน `MSG-{BRANCH}-{YYMM}-{NNNN}` reset รายเดือนแยกตามสาขา
+- **D15** — `contactName` / `address` / `detail` บังคับกรอก · **D18** — ต้องเลือกประเภทงาน ≥ 1
+
+### ลองด้วยมือ
+
+1. login เป็น `10002` (User สาขา SDC) → แจ้งงานใหม่ → ได้เลขใบงาน `MSG-SDC-{YYMM}-0001`
+2. login เป็น `20002` (User สาขา SBK) → **ต้องไม่เห็น** ใบงานของ SDC (BR-6) และเลขจะเริ่ม `MSG-SBK-...` แยกลำดับกัน
+3. บันทึกงานหลัง 10:00 → sendDate ต้องเป็นวันถัดไป (และข้ามเสาร์-อาทิตย์ไปวันจันทร์)
+
+> ⚠️ ยังไม่ได้ทำ: คิวงาน/ยืนยันงานของ Messenger, เปลี่ยนสถานะ, รูปภาพ, อีเมล, รายงาน — อยู่ใน Phase 2–5
 
 ---
 

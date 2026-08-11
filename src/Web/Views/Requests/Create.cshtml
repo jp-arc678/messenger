@@ -1,0 +1,35 @@
+@model RequestFormViewModel
+@{
+    ViewBag.Title = "แจ้งงานรับ-ส่งเอกสาร";
+}
+
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-9">
+
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <h1 class="h4 mb-0">แจ้งงานรับ-ส่งเอกสาร</h1>
+            <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("Index")">กลับไปรายการ</a>
+        </div>
+
+        @* autocomplete="off" กัน browser เอาค่าที่เคยกรอกไว้มาทับค่าเริ่มต้นตอน refresh/กดย้อนกลับ *@
+        @using (Html.BeginForm("Create", "Requests", FormMethod.Post, new { autocomplete = "off" }))
+        {
+            @Html.AntiForgeryToken()
+
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    @Html.Partial("_Form", Model)
+                </div>
+                <div class="card-footer bg-white d-flex gap-2 justify-content-end py-3">
+                    <a class="btn btn-outline-secondary" href="@Url.Action("Index")">ยกเลิก</a>
+                    <button type="submit" class="btn btn-primary">บันทึกใบแจ้งงาน</button>
+                </div>
+            </div>
+        }
+
+    </div>
+</div>
+
+@section scripts {
+    <script src="@Url.Content("~/Scripts/request-form.js")"></script>
+}

@@ -1,0 +1,103 @@
+@model RequestFormViewModel
+@*
+    ฟอร์มกลางที่ใช้ทั้งหน้าสร้างและหน้าแก้ไข
+    ผู้เรียกเป็นคนเปิด/ปิด <form> และปุ่ม submit เอง
+*@
+
+@if (Model.Errors != null && Model.Errors.Count > 0)
+{
+    <div class="alert alert-danger" role="alert">
+        <div class="fw-semibold mb-1">ยังบันทึกไม่ได้</div>
+        <ul class="mb-0 ps-3">
+            @foreach (var error in Model.Errors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    </div>
+}
+
+<input type="hidden" name="ReqId" value="@Model.ReqId" />
+<input type="hidden" name="RowVersion" value="@Model.RowVersion" />
+
+<div class="row g-3">
+
+    <div class="col-12 col-md-6">
+        <label class="form-label" for="RequesterEmpCode">ผู้แจ้ง <span class="text-danger">*</span></label>
+        @Html.DropDownList("RequesterEmpCode", Model.RequesterOptions,
+            new { @class = "form-select", id = "RequesterEmpCode", autocomplete = "off" })
+        <div class="form-text">
+            ค่าเริ่มต้นคือตัวคุณเอง — เปลี่ยนได้ถ้าต้องการแจ้งแทนคนอื่น (เฉพาะพนักงานในสาขาเดียวกัน)
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6">
+        <label class="form-label" for="SendDate">วันที่ต้องการให้ส่ง <span class="text-danger">*</span></label>
+        <input type="date" class="form-control" id="SendDate" name="SendDate" value="@Model.SendDate" />
+        <div class="form-text">ห้ามเลือกวันย้อนหลัง และห้ามเลือกวันเสาร์-อาทิตย์</div>
+    </div>
+
+    <div class="col-12">
+        <label class="form-label d-block">ประเภทงาน <span class="text-danger">*</span></label>
+        <div class="border rounded p-3">
+            @for (var i = 0; i < Model.JobTypes.Count; i++)
+            {
+                var item = Model.JobTypes[i];
+                var checkboxId = "jobType" + i;
+                var detailId = "jobTypeDetail" + i;
+
+                <div class="row g-2 align-items-center @(i > 0 ? "mt-1" : "")">
+                    <div class="col-12 col-sm-4">
+                        <input type="hidden" name="JobTypes[@i].Code" value="@item.Code" />
+                        <div class="form-check">
+                            <input class="form-check-input js-jobtype" type="checkbox" value="true"
+                                   id="@checkboxId" name="JobTypes[@i].Selected"
+                                   data-detail-target="@detailId" checked="@item.Selected" />
+                            <input type="hidden" name="JobTypes[@i].Selected" value="false" />
+                            <label class="form-check-label" for="@checkboxId">@item.DisplayName</label>
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-8">
+                        <input type="text" class="form-control form-control-sm" id="@detailId"
+                               name="JobTypes[@i].DetailText" value="@item.DetailText"
+                               placeholder="รายละเอียดเพิ่มเติม (ไม่บังคับ)"
+                               disabled="@(!item.Selected)" />
+                    </div>
+                </div>
+            }
+        </div>
+        <div class="form-text">เลือกได้มากกว่า 1 ประเภท และระบุรายละเอียดเพิ่มเติมต่อแต่ละประเภทได้</div>
+    </div>
+
+    <div class="col-12 col-md-6">
+        <label class="form-label" for="ContactName">ชื่อผู้ติดต่อ / หน่วยงานปลายทาง <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" id="ContactName" name="ContactName" value="@Model.ContactName" />
+    </div>
+
+    <div class="col-12 col-md-6">
+        <label class="form-label" for="Phone">เบอร์โทรติดต่อ</label>
+        <input type="text" class="form-control" id="Phone" name="Phone" value="@Model.Phone" />
+    </div>
+
+    <div class="col-12">
+        <label class="form-label" for="Address">ที่อยู่ปลายทาง <span class="text-danger">*</span></label>
+        <textarea class="form-control" id="Address" name="Address" rows="3">@Model.Address</textarea>
+    </div>
+
+    <div class="col-12">
+        <label class="form-label" for="Detail">รายละเอียดงาน <span class="text-danger">*</span></label>
+        <textarea class="form-control" id="Detail" name="Detail" rows="4">@Model.Detail</textarea>
+    </div>
+
+    <div class="col-12">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="true" id="IsPersonal"
+                   name="IsPersonal" checked="@Model.IsPersonal" />
+            <input type="hidden" name="IsPersonal" value="false" />
+            <label class="form-check-label" for="IsPersonal">
+                เป็นงานฝากส่วนตัว (ไม่ใช่งานของบริษัท)
+            </label>
+        </div>
+    </div>
+
+</div>
