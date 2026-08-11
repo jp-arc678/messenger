@@ -239,7 +239,9 @@ BEGIN
            RequesterPhoneExt, RequesterEmail,
            RequestDateTime, SendDate, ContactName, Address, Phone, Detail,
            Status, IsPersonal, ReceiptConfirmed, [RowVersion],
-           CreatedBy, CreatedAt, UpdatedBy, UpdatedAt
+           CreatedBy, CreatedAt, UpdatedBy, UpdatedAt,
+           MessengerEmpCode, MessengerName, ConfirmedAt, SequenceOrder,
+           Route, DistanceKm, ReturnToOffice
     FROM dbo.vwDeliveryRequest
     WHERE ReqId      = @ReqId
       AND BranchCode = @BranchCode;
@@ -254,7 +256,9 @@ GO
      - ส่ง NULL       = เห็นทุกใบในสาขา (ใช้กับ A-Admin / M-Messenger)
    การตัดสินใจว่าจะส่งค่าไหน เป็นหน้าที่ของ service layer
 
-   @SendDateFrom / @SendDateTo : ช่วงวันส่ง (ส่ง NULL = ไม่กรอง)
+   @SendDateFrom / @SendDateTo       : ช่วงวันส่ง (ส่ง NULL = ไม่กรอง)
+   @RequestDateFrom / @RequestDateTo : ช่วง "วันที่บันทึก" (ส่ง NULL = ไม่กรอง)
+   @Status                           : สถานะเดียว (ส่ง NULL = ทุกสถานะ)
    ============================================================= */
 IF OBJECT_ID(N'dbo.spDeliveryRequestList', N'P') IS NOT NULL
     DROP PROCEDURE dbo.spDeliveryRequestList;
@@ -264,22 +268,35 @@ CREATE PROCEDURE dbo.spDeliveryRequestList
     @BranchCode         CHAR(3),
     @RequesterEmpCode   VARCHAR(20) = NULL,
     @SendDateFrom       DATE        = NULL,
-    @SendDateTo         DATE        = NULL
+    @SendDateTo         DATE        = NULL,
+    @RequestDateFrom    DATE        = NULL,
+    @RequestDateTo      DATE        = NULL,
+    @Status             VARCHAR(20) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
+
+    -- RequestDateTime เก็บเวลาด้วย จึงเทียบขอบบนเป็น "ก่อนเที่ยงคืนของวันถัดไป"
+    -- แทนการใช้ <= @RequestDateTo ซึ่งจะตัดงานที่แจ้งหลัง 00:00 ของวันนั้นทิ้งทั้งวัน
+    DECLARE @RequestDateToExclusive DATETIME2(0) =
+        CASE WHEN @RequestDateTo IS NULL THEN NULL ELSE DATEADD(DAY, 1, CAST(@RequestDateTo AS DATETIME2(0))) END;
 
     SELECT ReqId, ReqNo, BranchCode, BranchName,
            RequesterEmpCode, RequesterName, RequesterDeptCode, RequesterUnitName,
            RequesterPhoneExt, RequesterEmail,
            RequestDateTime, SendDate, ContactName, Address, Phone, Detail,
            Status, IsPersonal, ReceiptConfirmed, [RowVersion],
-           CreatedBy, CreatedAt, UpdatedBy, UpdatedAt
+           CreatedBy, CreatedAt, UpdatedBy, UpdatedAt,
+           MessengerEmpCode, MessengerName, ConfirmedAt, SequenceOrder,
+           Route, DistanceKm, ReturnToOffice
     FROM dbo.vwDeliveryRequest
     WHERE BranchCode = @BranchCode
       AND (@RequesterEmpCode IS NULL OR RequesterEmpCode = @RequesterEmpCode)
       AND (@SendDateFrom     IS NULL OR SendDate >= @SendDateFrom)
       AND (@SendDateTo       IS NULL OR SendDate <= @SendDateTo)
+      AND (@RequestDateFrom  IS NULL OR RequestDateTime >= @RequestDateFrom)
+      AND (@RequestDateToExclusive IS NULL OR RequestDateTime < @RequestDateToExclusive)
+      AND (@Status           IS NULL OR Status = @Status)
     ORDER BY SendDate DESC, ReqNo DESC;
 END
 GO

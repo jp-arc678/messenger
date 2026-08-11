@@ -19,17 +19,34 @@
     <div class="alert alert-success" role="alert">@Model.Message</div>
 }
 
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+}
+
 <form method="get" class="card card-body mb-3">
     <div class="row g-2 align-items-end">
-        <div class="col-12 col-sm-4 col-lg-3">
+        <div class="col-6 col-lg-2">
             <label class="form-label" for="sendDateFrom">วันที่ส่ง ตั้งแต่</label>
             <input type="date" class="form-control" id="sendDateFrom" name="sendDateFrom" value="@Model.SendDateFrom" />
         </div>
-        <div class="col-12 col-sm-4 col-lg-3">
+        <div class="col-6 col-lg-2">
             <label class="form-label" for="sendDateTo">ถึง</label>
             <input type="date" class="form-control" id="sendDateTo" name="sendDateTo" value="@Model.SendDateTo" />
         </div>
-        <div class="col-12 col-sm-4 col-lg-3 d-flex gap-2">
+        <div class="col-6 col-lg-2">
+            <label class="form-label" for="requestDateFrom">วันที่บันทึก ตั้งแต่</label>
+            <input type="date" class="form-control" id="requestDateFrom" name="requestDateFrom" value="@Model.RequestDateFrom" />
+        </div>
+        <div class="col-6 col-lg-2">
+            <label class="form-label" for="requestDateTo">ถึง</label>
+            <input type="date" class="form-control" id="requestDateTo" name="requestDateTo" value="@Model.RequestDateTo" />
+        </div>
+        <div class="col-12 col-sm-6 col-lg-2">
+            <label class="form-label" for="status">สถานะ</label>
+            @Html.DropDownList("status", Model.StatusOptions, new { @class = "form-select", id = "status" })
+        </div>
+        <div class="col-12 col-sm-6 col-lg-2 d-flex gap-2">
             <button type="submit" class="btn btn-outline-primary">ค้นหา</button>
             <a class="btn btn-outline-secondary" href="@Url.Action("Index")">ล้าง</a>
         </div>
@@ -49,6 +66,7 @@ else
             <thead>
                 <tr>
                     <th scope="col">เลขใบงาน</th>
+                    <th scope="col">วันที่บันทึก</th>
                     <th scope="col">วันที่ส่ง</th>
                     <th scope="col">ผู้ติดต่อ</th>
                     @if (Model.SeesWholeBranch)
@@ -70,7 +88,14 @@ else
                                 <span class="badge text-bg-light ms-1">ส่วนตัว</span>
                             }
                         </td>
-                        <td>@request.SendDate.ToString("dd/MM/yyyy")</td>
+                        <td>@request.RequestDateTime.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>
+                            @request.SendDate.ToString("dd/MM/yyyy")
+                            @if (request.SequenceOrder.HasValue)
+                            {
+                                <span class="badge text-bg-dark ms-1" title="ลำดับวิ่งงานของวัน">@request.SequenceOrder</span>
+                            }
+                        </td>
                         <td>@request.ContactName</td>
                         @if (Model.SeesWholeBranch)
                         {

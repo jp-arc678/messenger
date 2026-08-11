@@ -41,8 +41,11 @@ LEFT JOIN dbo.tblUserRole AS ur
 GO
 
 /* ---------- vwDeliveryRequest ----------
-   ใบแจ้งงาน + ชื่อสาขา + ข้อมูลผู้แจ้ง (join ไว้ให้แล้ว)
+   ใบแจ้งงาน + ชื่อสาขา + ข้อมูลผู้แจ้ง + การรับงานของ Messenger (join ไว้ให้แล้ว)
    ทุก query ที่ใช้ view นี้ "ต้อง" มี WHERE BranchCode เสมอ ตาม BR-6
+
+   ส่วนของ assignment เป็น LEFT JOIN เพราะใบงานสถานะ Received ยังไม่มีคนรับงาน
+   คอลัมน์ SequenceOrder / MessengerEmpCode / ConfirmedAt จึงเป็น NULL ได้
    --------------------------------------- */
 IF OBJECT_ID(N'dbo.vwDeliveryRequest', N'V') IS NOT NULL
     DROP VIEW dbo.vwDeliveryRequest;
@@ -74,12 +77,23 @@ SELECT
     r.CreatedBy,
     r.CreatedAt,
     r.UpdatedBy,
-    r.UpdatedAt
+    r.UpdatedAt,
+    a.MessengerEmpCode,
+    m.FullName   AS MessengerName,
+    a.ConfirmedAt,
+    a.SequenceOrder,
+    a.Route,
+    a.DistanceKm,
+    a.ReturnToOffice
 FROM dbo.tblDeliveryRequest AS r
 INNER JOIN dbo.tblBranch AS b
         ON b.BranchCode = r.BranchCode
 INNER JOIN dbo.tblEmployee AS e
-        ON e.EmpCode = r.RequesterEmpCode;
+        ON e.EmpCode = r.RequesterEmpCode
+LEFT JOIN dbo.tblMessengerAssignment AS a
+        ON a.ReqId = r.ReqId
+LEFT JOIN dbo.tblEmployee AS m
+        ON m.EmpCode = a.MessengerEmpCode;
 GO
 
 PRINT '--- 020_Views.sql completed ---';

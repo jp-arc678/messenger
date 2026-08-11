@@ -83,7 +83,16 @@ namespace Messenger.Domain.Entities
 
         public IList<RequestJobType> JobTypes { get; set; } = new List<RequestJobType>();
 
+        /// <summary>
+        /// การรับงานของ Messenger — null ตราบใดที่ยังไม่มีใครยืนยันรับงาน
+        /// (ใบงานสถานะ Received จึงเป็น null เสมอ)
+        /// </summary>
+        public MessengerAssignment Assignment { get; set; }
+
         public string StatusDisplayName => RequestStatuses.ToDisplayName(Status);
+
+        /// <summary>ลำดับวิ่งงานของวัน — null ถ้ายังไม่ถูกยืนยันรับงาน (D11)</summary>
+        public int? SequenceOrder => Assignment?.SequenceOrder;
 
         /// <summary>
         /// ใบงานนี้มีประเภท "รับเอกสาร" หรือไม่

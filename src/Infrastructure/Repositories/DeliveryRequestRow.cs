@@ -33,6 +33,15 @@ namespace Messenger.Infrastructure.Repositories
         public string UpdatedBy { get; set; }
         public DateTime? UpdatedAt { get; set; }
 
+        // ---- ส่วนที่มาจาก LEFT JOIN tblMessengerAssignment (null ถ้ายังไม่ยืนยันรับงาน) ----
+        public string MessengerEmpCode { get; set; }
+        public string MessengerName { get; set; }
+        public DateTime? ConfirmedAt { get; set; }
+        public int? SequenceOrder { get; set; }
+        public string Route { get; set; }
+        public decimal? DistanceKm { get; set; }
+        public bool? ReturnToOffice { get; set; }
+
         public DeliveryRequest ToEntity()
         {
             return new DeliveryRequest
@@ -62,7 +71,60 @@ namespace Messenger.Infrastructure.Repositories
                 CreatedAt = CreatedAt,
                 UpdatedBy = UpdatedBy,
                 UpdatedAt = UpdatedAt,
-                JobTypes = new List<RequestJobType>()
+                JobTypes = new List<RequestJobType>(),
+                Assignment = ToAssignment()
+            };
+        }
+
+        /// <summary>คืน null เมื่อยังไม่มีใครยืนยันรับงาน (คอลัมน์จาก LEFT JOIN เป็น NULL ทั้งชุด)</summary>
+        private MessengerAssignment ToAssignment()
+        {
+            if (string.IsNullOrWhiteSpace(MessengerEmpCode) || !SequenceOrder.HasValue)
+                return null;
+
+            return new MessengerAssignment
+            {
+                ReqId = ReqId,
+                MessengerEmpCode = MessengerEmpCode,
+                MessengerName = MessengerName,
+                ConfirmedAt = ConfirmedAt ?? default(DateTime),
+                SequenceOrder = SequenceOrder.Value,
+                Route = Route,
+                DistanceKm = DistanceKm,
+                ReturnToOffice = ReturnToOffice
+            };
+        }
+    }
+
+    /// <summary>รูปร่างของแถวจาก dbo.spStatusHistoryListByReq</summary>
+    internal class StatusHistoryRow
+    {
+        public long HistoryId { get; set; }
+        public int ReqId { get; set; }
+        public string FromStatus { get; set; }
+        public string ToStatus { get; set; }
+        public string ByEmpCode { get; set; }
+        public string ByName { get; set; }
+        public DateTime ChangedAt { get; set; }
+        public string Note { get; set; }
+
+        public StatusHistoryEntry ToEntity()
+        {
+            return new StatusHistoryEntry
+            {
+                HistoryId = HistoryId,
+                ReqId = ReqId,
+
+                // FromStatus เป็น NULL เฉพาะบรรทัดแรกสุด (ตอนสร้างใบงาน)
+                FromStatus = string.IsNullOrWhiteSpace(FromStatus)
+                    ? (RequestStatus?)null
+                    : RequestStatuses.Parse(FromStatus),
+
+                ToStatus = RequestStatuses.Parse(ToStatus),
+                ByEmpCode = ByEmpCode,
+                ByName = ByName,
+                ChangedAt = ChangedAt,
+                Note = Note
             };
         }
     }

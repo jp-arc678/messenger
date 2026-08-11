@@ -35,6 +35,30 @@ FROM MessengerDb.dbo.tblReqNoSequence
 ORDER BY BranchCode, YyMm;
 '@
 
+Invoke-Sql 'การรับงานของ Messenger + ลำดับวิ่งงาน (D11)' @'
+SELECT a.ReqId, r.ReqNo, r.BranchCode,
+       CONVERT(varchar(10), r.SendDate, 120) AS SendDate,
+       a.SequenceOrder, a.MessengerEmpCode,
+       CONVERT(varchar(16), a.ConfirmedAt, 120) AS ConfirmedAt
+FROM MessengerDb.dbo.tblMessengerAssignment AS a
+INNER JOIN MessengerDb.dbo.tblDeliveryRequest AS r ON r.ReqId = a.ReqId
+ORDER BY r.BranchCode, r.SendDate, a.SequenceOrder;
+'@
+
+Invoke-Sql 'ประวัติการเปลี่ยนสถานะทั้งหมด (audit trail ตาม §6)' @'
+SELECT ReqId, ISNULL(FromStatus, '(สร้างใหม่)') AS FromStatus, ToStatus, ByEmpCode,
+       CONVERT(varchar(16), ChangedAt, 120) AS ChangedAt, Note
+FROM MessengerDb.dbo.tblStatusHistory
+ORDER BY ReqId, HistoryId;
+'@
+
+Invoke-Sql 'เหตุผลการพัก / การยกเลิก' @'
+SELECT 'Pause' AS Kind, ReqId, ByEmpCode, Reason FROM MessengerDb.dbo.tblPauseReason
+UNION ALL
+SELECT 'Cancel', ReqId, ByEmpCode, Reason FROM MessengerDb.dbo.tblCancelReason
+ORDER BY ReqId;
+'@
+
 Invoke-Sql 'ผลลัพธ์จริงของ spDeliveryRequestList : สาขา SDC ทั้งสาขา' @'
 EXEC MessengerDb.dbo.spDeliveryRequestList @BranchCode = 'SDC';
 '@

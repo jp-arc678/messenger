@@ -83,6 +83,7 @@
     <Compile Include="Controllers\AccountController.cs" />
     <Compile Include="Controllers\BaseController.cs" />
     <Compile Include="Controllers\HomeController.cs" />
+    <Compile Include="Controllers\QueueController.cs" />
     <Compile Include="Controllers\RequestsController.cs" />
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
@@ -91,8 +92,11 @@
     <Compile Include="Security\MessengerPrincipal.cs" />
     <Compile Include="Security\UserContextTicket.cs" />
     <Compile Include="ViewModels\LoginViewModel.cs" />
+    <Compile Include="ViewModels\QueueViewModel.cs" />
+    <Compile Include="ViewModels\RequestDetailsViewModel.cs" />
     <Compile Include="ViewModels\RequestFormViewModel.cs" />
     <Compile Include="ViewModels\RequestListViewModel.cs" />
+    <Compile Include="ViewModels\StatusActionsViewModel.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -105,7 +109,9 @@
     <Content Include="Views\web.config" />
     <Content Include="Views\_ViewStart.cshtml" />
     <Content Include="Views\Shared\_Layout.cshtml" />
+    <Content Include="Views\Shared\_StatusActions.cshtml" />
     <Content Include="Views\Shared\RequestNotFound.cshtml" />
+    <Content Include="Views\Queue\Index.cshtml" />
     <Content Include="Views\Account\Login.cshtml" />
     <Content Include="Views\Home\Index.cshtml" />
     <Content Include="Views\Requests\Index.cshtml" />

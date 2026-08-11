@@ -522,7 +522,7 @@ namespace Messenger.UnitTests
             otherPersonCommand.RequesterEmpCode = "10004";
             _service.Create(otherPersonCommand, User("10002"));
 
-            var mine = _service.List(User("10002"), null, null);
+            var mine = _service.List(User("10002"), new RequestListQuery());
 
             Assert.That(mine.Count, Is.EqualTo(1));
             Assert.That(mine.All(r => r.RequesterEmpCode == "10002"), Is.True);
@@ -537,8 +537,8 @@ namespace Messenger.UnitTests
             otherPersonCommand.RequesterEmpCode = "10004";
             _service.Create(otherPersonCommand, User("10002"));
 
-            Assert.That(_service.List(User("10001", "SDC", Role.Admin), null, null).Count, Is.EqualTo(2));
-            Assert.That(_service.List(User("10003", "SDC", Role.Messenger), null, null).Count, Is.EqualTo(2));
+            Assert.That(_service.List(User("10001", "SDC", Role.Admin), new RequestListQuery()).Count, Is.EqualTo(2));
+            Assert.That(_service.List(User("10003", "SDC", Role.Messenger), new RequestListQuery()).Count, Is.EqualTo(2));
         }
 
         [Test]
@@ -547,7 +547,7 @@ namespace Messenger.UnitTests
             _service.Create(ValidCommand(), User("10002", "SDC"));
             _service.Create(ValidCommand(), User("20002", "SBK"));
 
-            var sdc = _service.List(User("10001", "SDC", Role.Admin), null, null);
+            var sdc = _service.List(User("10001", "SDC", Role.Admin), new RequestListQuery());
 
             Assert.That(sdc.Count, Is.EqualTo(1));
             Assert.That(sdc.All(r => r.BranchCode == "SDC"), Is.True);

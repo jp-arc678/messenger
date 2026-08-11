@@ -1,0 +1,172 @@
+@model QueueViewModel
+@{
+    ViewBag.Title = "คิวงานประจำวัน";
+}
+
+@helper QueueCard(QueueRowViewModel row, string queueDate, bool showSequence)
+{
+    var request = row.Request;
+
+    <div class="list-group-item">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+            <div class="flex-grow-1">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                    @if (showSequence && request.SequenceOrder.HasValue)
+                    {
+                        <span class="badge rounded-pill text-bg-dark">@request.SequenceOrder</span>
+                    }
+                    <a class="fw-semibold text-decoration-none"
+                       href="@Url.Action("Details", "Requests", new { id = request.ReqId })">
+                        <code>@request.ReqNo</code>
+                    </a>
+                    <span class="badge text-bg-secondary">@request.StatusDisplayName</span>
+                    @if (request.IsPersonal)
+                    {
+                        <span class="badge text-bg-light">ส่วนตัว</span>
+                    }
+                </div>
+
+                <div>@request.ContactName</div>
+                <div class="text-body-secondary small">@request.Address</div>
+                <div class="text-body-secondary small">
+                    ผู้แจ้ง @request.RequesterName · แจ้งเมื่อ @request.RequestDateTime.ToString("dd/MM/yyyy HH:mm")
+                    @if (request.Assignment != null)
+                    {
+                        <text> · รับงานโดย @request.Assignment.MessengerName</text>
+                    }
+                </div>
+            </div>
+
+            @if (row.CanMoveUp || row.CanMoveDown)
+            {
+                <div class="d-flex gap-1" role="group" aria-label="จัดลำดับคิว">
+                    @using (Html.BeginForm("Move", "Queue", new { date = queueDate }, FormMethod.Post))
+                    {
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@request.ReqId" />
+                        <input type="hidden" name="direction" value="@QueueMove.Up" />
+                        <button type="submit" class="btn btn-sm btn-outline-secondary" title="เลื่อนขึ้น"
+                                @(row.CanMoveUp ? null : "disabled")>&uarr;</button>
+                    }
+                    @using (Html.BeginForm("Move", "Queue", new { date = queueDate }, FormMethod.Post))
+                    {
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@request.ReqId" />
+                        <input type="hidden" name="direction" value="@QueueMove.Down" />
+                        <button type="submit" class="btn btn-sm btn-outline-secondary" title="เลื่อนลง"
+                                @(row.CanMoveDown ? null : "disabled")>&darr;</button>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="mt-2">
+            @Html.Partial("_StatusActions", new StatusActionsViewModel
+            {
+                ReqId = request.ReqId,
+                Actions = row.Actions,
+                ReturnTo = "queue",
+                QueueDate = queueDate,
+                Compact = true
+            })
+        </div>
+    </div>
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="h4 mb-1">คิวงานประจำวัน</h1>
+        <div class="text-body-secondary small">
+            สาขา @Model.Day.BranchCode — @Model.Day.BranchName ·
+            วันที่ส่ง @Model.Day.SendDate.ToString("dd/MM/yyyy") ·
+            ทั้งหมด @Model.Day.TotalCount ใบ
+        </div>
+    </div>
+    <a class="btn btn-outline-secondary" href="@Url.Action("Index", "Requests")">ไปหน้ารายการใบแจ้งงาน</a>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.Message))
+{
+    <div class="alert alert-success" role="alert">@Model.Message</div>
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+}
+
+<form method="get" class="card card-body mb-3">
+    <div class="row g-2 align-items-end">
+        <div class="col-12 col-sm-5 col-lg-3">
+            <label class="form-label" for="date">วันที่ส่ง</label>
+            <input type="date" class="form-control" id="date" name="date" value="@Model.DateText" />
+        </div>
+        <div class="col-12 col-sm-7 col-lg-6 d-flex flex-wrap gap-2">
+            <button type="submit" class="btn btn-outline-primary">ดูคิว</button>
+            <a class="btn btn-outline-secondary"
+               href="@Url.Action("Index", new { date = Model.PreviousDateText })">&laquo; วันก่อนหน้า</a>
+            <a class="btn btn-outline-secondary"
+               href="@Url.Action("Index", new { date = Model.NextDateText })">วันถัดไป &raquo;</a>
+        </div>
+    </div>
+</form>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">รอยืนยันรับงาน</span>
+        <span class="badge text-bg-secondary">@Model.Pending.Count</span>
+    </div>
+    @if (Model.Pending.Count == 0)
+    {
+        <div class="card-body text-body-secondary">ไม่มีใบงานที่รอยืนยันในวันนี้</div>
+    }
+    else
+    {
+        <div class="list-group list-group-flush">
+            @foreach (var row in Model.Pending)
+            {
+                @QueueCard(row, Model.DateText, false)
+            }
+        </div>
+    }
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">คิววิ่งงาน (เรียงตามลำดับ)</span>
+        <span class="badge text-bg-secondary">@Model.Running.Count</span>
+    </div>
+    @if (Model.Running.Count == 0)
+    {
+        <div class="card-body text-body-secondary">ยังไม่มีงานที่ยืนยันรับแล้วในวันนี้</div>
+    }
+    else
+    {
+        <div class="list-group list-group-flush">
+            @foreach (var row in Model.Running)
+            {
+                @QueueCard(row, Model.DateText, true)
+            }
+        </div>
+    }
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">ปิดแล้ววันนี้</span>
+        <span class="badge text-bg-secondary">@Model.Closed.Count</span>
+    </div>
+    @if (Model.Closed.Count == 0)
+    {
+        <div class="card-body text-body-secondary">ยังไม่มีงานที่ปิดในวันนี้</div>
+    }
+    else
+    {
+        <div class="list-group list-group-flush">
+            @foreach (var row in Model.Closed)
+            {
+                @QueueCard(row, Model.DateText, true)
+            }
+        </div>
+    }
+</div>

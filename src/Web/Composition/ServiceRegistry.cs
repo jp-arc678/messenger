@@ -29,6 +29,7 @@ namespace Messenger.Web.Composition
             IEmployeeRepository employees = new EmployeeRepository(connectionFactory);
             IBranchRepository branches = new BranchRepository(connectionFactory);
             IDeliveryRequestRepository requests = new DeliveryRequestRepository(connectionFactory);
+            IRequestWorkflowRepository workflowRepository = new RequestWorkflowRepository(connectionFactory);
 
             // D3 — SSO ยังเป็น stub ในเฟส 0 เมื่อได้ contract จริงให้สลับบรรทัดนี้บรรทัดเดียว
             ISsoClient sso = new MockSsoClient();
@@ -37,6 +38,8 @@ namespace Messenger.Web.Composition
 
             IAuthService authService = new AuthService(sso, employees, branches);
             IDeliveryRequestService requestService = new DeliveryRequestService(requests, employees, clock);
+            IRequestWorkflowService workflowService =
+                new RequestWorkflowService(requests, workflowRepository, employees, clock);
 
             var factories = new Dictionary<Type, Func<object>>
             {
@@ -44,15 +47,18 @@ namespace Messenger.Web.Composition
                 { typeof(IEmployeeRepository), () => employees },
                 { typeof(IBranchRepository), () => branches },
                 { typeof(IDeliveryRequestRepository), () => requests },
+                { typeof(IRequestWorkflowRepository), () => workflowRepository },
                 { typeof(ISsoClient), () => sso },
                 { typeof(IClock), () => clock },
                 { typeof(IAuthService), () => authService },
                 { typeof(IDeliveryRequestService), () => requestService },
+                { typeof(IRequestWorkflowService), () => workflowService },
 
                 // controller ที่มี dependency ต้องลงทะเบียนไว้
                 // (controller ที่ไม่มี dependency ปล่อยให้ MVC สร้างเองได้)
                 { typeof(AccountController), () => new AccountController(authService) },
-                { typeof(RequestsController), () => new RequestsController(requestService) }
+                { typeof(RequestsController), () => new RequestsController(requestService, workflowService) },
+                { typeof(QueueController), () => new QueueController(workflowService, clock) }
             };
 
             return new MessengerDependencyResolver(factories);

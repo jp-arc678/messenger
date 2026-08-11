@@ -6,7 +6,8 @@ namespace Messenger.Domain.Enums
     /// สถานะใบแจ้งงาน 5 สถานะ (CLAUDE.md §4)
     ///
     /// การเปลี่ยนสถานะทำได้เฉพาะ transition ที่มีในตาราง §6 เท่านั้น
-    /// ตัว state machine จะถูกเขียนใน Phase 2 — enum นี้เป็นเพียงคำศัพท์ของ domain
+    /// enum นี้เป็นเพียงคำศัพท์ของ domain ส่วนตัวตัดสินว่าเปลี่ยนได้ไหม
+    /// อยู่ที่ <see cref="Workflow.RequestStateMachine"/>
     /// </summary>
     public enum RequestStatus
     {

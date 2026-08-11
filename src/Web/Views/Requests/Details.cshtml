@@ -1,38 +1,61 @@
-@model Messenger.Domain.Entities.DeliveryRequest
+@model RequestDetailsViewModel
 @{
     ViewBag.Title = "รายละเอียดใบแจ้งงาน";
-    var canEdit = ViewBag.CanEdit != null && (bool)ViewBag.CanEdit;
-    var message = TempData["Message"] as string;
+    var request = Model.Request;
 }
 
 <div class="row justify-content-center">
     <div class="col-12 col-lg-9">
 
-        @if (!string.IsNullOrEmpty(message))
+        @if (!string.IsNullOrEmpty(Model.Message))
         {
-            <div class="alert alert-success" role="alert">@message</div>
+            <div class="alert alert-success" role="alert">@Model.Message</div>
+        }
+
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
         }
 
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
             <div>
-                <h1 class="h4 mb-1">@Model.ReqNo</h1>
-                <span class="badge text-bg-secondary">@Model.StatusDisplayName</span>
-                <span class="badge text-bg-primary">สาขา @Model.BranchCode</span>
-                @if (Model.IsPersonal)
+                <h1 class="h4 mb-1">@request.ReqNo</h1>
+                <span class="badge text-bg-secondary">@request.StatusDisplayName</span>
+                <span class="badge text-bg-primary">สาขา @request.BranchCode</span>
+                @if (request.SequenceOrder.HasValue)
+                {
+                    <span class="badge text-bg-dark">ลำดับที่ @request.SequenceOrder</span>
+                }
+                @if (request.IsPersonal)
                 {
                     <span class="badge text-bg-light">งานฝากส่วนตัว</span>
                 }
             </div>
             <div class="d-flex gap-2">
                 <a class="btn btn-outline-secondary" href="@Url.Action("Index")">กลับไปรายการ</a>
-                @if (canEdit)
+                @if (Model.CanEdit)
                 {
-                    <a class="btn btn-primary" href="@Url.Action("Edit", new { id = Model.ReqId })">แก้ไข</a>
+                    <a class="btn btn-primary" href="@Url.Action("Edit", new { id = request.ReqId })">แก้ไข</a>
                 }
             </div>
         </div>
 
-        @if (!canEdit)
+        @if (Model.Actions.Count > 0)
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white fw-semibold">ดำเนินการ</div>
+                <div class="card-body">
+                    @Html.Partial("_StatusActions", new StatusActionsViewModel
+                    {
+                        ReqId = request.ReqId,
+                        Actions = Model.Actions,
+                        ReturnTo = "details"
+                    })
+                </div>
+            </div>
+        }
+
+        @if (!Model.CanEdit)
         {
             <div class="alert alert-secondary small" role="alert">
                 ใบแจ้งงานนี้แก้ไขไม่ได้ — แก้ได้เฉพาะใบที่ตัวเองเป็นผู้แจ้ง และต้องอยู่ในสถานะ
@@ -43,14 +66,14 @@
         <div class="card shadow-sm mb-3">
             <div class="card-header bg-white fw-semibold">ประเภทงาน</div>
             <div class="card-body">
-                @if (Model.JobTypes == null || Model.JobTypes.Count == 0)
+                @if (request.JobTypes == null || request.JobTypes.Count == 0)
                 {
                     <div class="text-body-secondary">ไม่มีข้อมูล</div>
                 }
                 else
                 {
                     <ul class="list-unstyled mb-0">
-                        @foreach (var jobType in Model.JobTypes)
+                        @foreach (var jobType in request.JobTypes)
                         {
                             <li class="mb-1">
                                 <span class="badge text-bg-info">@jobType.JobTypeDisplayName</span>
@@ -70,59 +93,104 @@
             <div class="card-body">
                 <dl class="row mb-0">
                     <dt class="col-sm-4 col-lg-3">วันที่ส่ง</dt>
-                    <dd class="col-sm-8 col-lg-9">@Model.SendDate.ToString("dd/MM/yyyy")</dd>
+                    <dd class="col-sm-8 col-lg-9">@request.SendDate.ToString("dd/MM/yyyy")</dd>
 
                     <dt class="col-sm-4 col-lg-3">ผู้ติดต่อ</dt>
-                    <dd class="col-sm-8 col-lg-9">@Model.ContactName</dd>
+                    <dd class="col-sm-8 col-lg-9">@request.ContactName</dd>
 
                     <dt class="col-sm-4 col-lg-3">เบอร์โทร</dt>
-                    <dd class="col-sm-8 col-lg-9">@(string.IsNullOrWhiteSpace(Model.Phone) ? "-" : Model.Phone)</dd>
+                    <dd class="col-sm-8 col-lg-9">@(string.IsNullOrWhiteSpace(request.Phone) ? "-" : request.Phone)</dd>
 
                     <dt class="col-sm-4 col-lg-3">ที่อยู่</dt>
-                    <dd class="col-sm-8 col-lg-9" style="white-space: pre-line;">@Model.Address</dd>
+                    <dd class="col-sm-8 col-lg-9" style="white-space: pre-line;">@request.Address</dd>
 
                     <dt class="col-sm-4 col-lg-3">รายละเอียดงาน</dt>
-                    <dd class="col-sm-8 col-lg-9" style="white-space: pre-line;">@Model.Detail</dd>
+                    <dd class="col-sm-8 col-lg-9" style="white-space: pre-line;">@request.Detail</dd>
+
+                    @if (request.Assignment != null)
+                    {
+                        <dt class="col-sm-4 col-lg-3">ผู้รับงาน</dt>
+                        <dd class="col-sm-8 col-lg-9">
+                            @request.Assignment.MessengerName
+                            <code class="ms-1">@request.Assignment.MessengerEmpCode</code>
+                            <span class="text-body-secondary">
+                                · ยืนยันเมื่อ @request.Assignment.ConfirmedAt.ToString("dd/MM/yyyy HH:mm")
+                            </span>
+                        </dd>
+                    }
                 </dl>
             </div>
         </div>
 
-        <div class="card shadow-sm">
+        <div class="card shadow-sm mb-3">
             <div class="card-header bg-white fw-semibold">ข้อมูลผู้แจ้ง</div>
             <div class="card-body">
                 <dl class="row mb-0">
                     <dt class="col-sm-4 col-lg-3">ผู้แจ้ง</dt>
                     <dd class="col-sm-8 col-lg-9">
-                        @Model.RequesterName <code class="ms-1">@Model.RequesterEmpCode</code>
+                        @request.RequesterName <code class="ms-1">@request.RequesterEmpCode</code>
                     </dd>
 
                     <dt class="col-sm-4 col-lg-3">หน่วยงาน</dt>
-                    <dd class="col-sm-8 col-lg-9">@Model.RequesterUnitName</dd>
+                    <dd class="col-sm-8 col-lg-9">@request.RequesterUnitName</dd>
 
                     <dt class="col-sm-4 col-lg-3">เบอร์ภายใน</dt>
-                    <dd class="col-sm-8 col-lg-9">@Model.RequesterPhoneExt</dd>
+                    <dd class="col-sm-8 col-lg-9">@request.RequesterPhoneExt</dd>
 
                     <dt class="col-sm-4 col-lg-3">อีเมล</dt>
-                    <dd class="col-sm-8 col-lg-9">@Model.RequesterEmail</dd>
+                    <dd class="col-sm-8 col-lg-9">@request.RequesterEmail</dd>
 
                     <dt class="col-sm-4 col-lg-3">บันทึกเมื่อ</dt>
                     <dd class="col-sm-8 col-lg-9">
-                        @Model.RequestDateTime.ToString("dd/MM/yyyy HH:mm")
-                        @if (Model.CreatedBy != Model.RequesterEmpCode)
+                        @request.RequestDateTime.ToString("dd/MM/yyyy HH:mm")
+                        @if (request.CreatedBy != request.RequesterEmpCode)
                         {
-                            <span class="text-body-secondary">(บันทึกโดย @Model.CreatedBy)</span>
+                            <span class="text-body-secondary">(บันทึกโดย @request.CreatedBy)</span>
                         }
                     </dd>
 
-                    @if (Model.UpdatedAt.HasValue)
+                    @if (request.UpdatedAt.HasValue)
                     {
                         <dt class="col-sm-4 col-lg-3">แก้ไขล่าสุด</dt>
                         <dd class="col-sm-8 col-lg-9">
-                            @Model.UpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")
-                            <span class="text-body-secondary">โดย @Model.UpdatedBy</span>
+                            @request.UpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")
+                            <span class="text-body-secondary">โดย @request.UpdatedBy</span>
                         </dd>
                     }
                 </dl>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-semibold">ประวัติสถานะ</div>
+            <div class="card-body">
+                @if (Model.History.Count == 0)
+                {
+                    <div class="text-body-secondary">ไม่มีข้อมูล</div>
+                }
+                else
+                {
+                    <ol class="list-unstyled mb-0">
+                        @foreach (var entry in Model.History)
+                        {
+                            <li class="d-flex gap-2 mb-2">
+                                <div class="text-body-secondary small" style="min-width: 8.5rem;">
+                                    @entry.ChangedAt.ToString("dd/MM/yyyy HH:mm")
+                                </div>
+                                <div>
+                                    <span class="badge text-bg-secondary">@entry.ToStatusDisplayName</span>
+                                    <span class="text-body-secondary small ms-1">
+                                        โดย @(string.IsNullOrWhiteSpace(entry.ByName) ? entry.ByEmpCode : entry.ByName)
+                                    </span>
+                                    @if (!string.IsNullOrWhiteSpace(entry.Note))
+                                    {
+                                        <div class="small">@entry.Note</div>
+                                    }
+                                </div>
+                            </li>
+                        }
+                    </ol>
+                }
             </div>
         </div>
 

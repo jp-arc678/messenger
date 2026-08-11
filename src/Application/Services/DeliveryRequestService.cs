@@ -216,15 +216,27 @@ namespace Messenger.Application.Services
             return ServiceResult<DeliveryRequest>.Ok(request);
         }
 
-        public IReadOnlyList<DeliveryRequest> List(UserContext user, DateTime? sendDateFrom, DateTime? sendDateTo)
+        public IReadOnlyList<DeliveryRequest> List(UserContext user, RequestListQuery query)
         {
             if (user == null)
                 throw new ArgumentNullException(nameof(user));
 
-            // §5 — Admin/Messenger เห็นทั้งสาขา, User เห็นเฉพาะใบตัวเอง
-            var requesterFilter = SeesWholeBranch(user) ? null : user.EmpCode;
+            query = query ?? new RequestListQuery();
 
-            return _requests.List(user.BranchCode, requesterFilter, sendDateFrom, sendDateTo);
+            return _requests.List(new RequestListFilter
+            {
+                // BR-6 — สาขามาจากตัวผู้ใช้เสมอ ไม่ใช่จากหน้าจอ
+                BranchCode = user.BranchCode,
+
+                // §5 — Admin/Messenger เห็นทั้งสาขา, User เห็นเฉพาะใบตัวเอง
+                RequesterEmpCode = SeesWholeBranch(user) ? null : user.EmpCode,
+
+                SendDateFrom = query.SendDateFrom,
+                SendDateTo = query.SendDateTo,
+                RequestDateFrom = query.RequestDateFrom,
+                RequestDateTo = query.RequestDateTo,
+                Status = query.Status
+            });
         }
 
         public bool CanEdit(DeliveryRequest request, UserContext user)
@@ -254,17 +266,17 @@ namespace Messenger.Application.Services
 
         private static bool SeesWholeBranch(UserContext user)
         {
-            return user.IsAdmin || user.IsMessenger;
+            return RequestAccess.SeesWholeBranch(user);
         }
 
         private static bool IsOwner(DeliveryRequest request, UserContext user)
         {
-            return string.Equals(request.RequesterEmpCode, user.EmpCode, StringComparison.OrdinalIgnoreCase);
+            return RequestAccess.IsOwner(request, user);
         }
 
         private static bool SameBranch(string left, string right)
         {
-            return string.Equals(Normalize(left), Normalize(right), StringComparison.OrdinalIgnoreCase);
+            return RequestAccess.SameBranch(left, right);
         }
 
         private static string BuildCannotEditMessage(DeliveryRequest request, UserContext user)

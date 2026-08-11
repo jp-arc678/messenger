@@ -10,18 +10,24 @@ namespace Messenger.UnitTests.Fakes
     /// <summary>
     /// ที่เก็บใบแจ้งงานปลอมในหน่วยความจำ
     ///
-    /// จำลองพฤติกรรมสำคัญ 3 อย่างของ DB จริง :
-    /// - เลขลำดับแยกตาม (สาขา + YYMM) และเริ่มที่ 1 เสมอเมื่อขึ้นคู่ใหม่ (BR-8)
+    /// จำลองพฤติกรรมสำคัญของ DB จริง :
+    /// - เลขลำดับใบงานแยกตาม (สาขา + YYMM) และเริ่มที่ 1 เสมอเมื่อขึ้นคู่ใหม่ (BR-8)
     /// - อ่าน/เขียนได้เฉพาะเมื่อ branchCode ตรง (BR-6)
     /// - rowVersion เปลี่ยนทุกครั้งที่บันทึกสำเร็จ (BR-2)
+    /// - เปลี่ยนสถานะได้เฉพาะเมื่อสถานะปัจจุบันยังตรงกับที่ผู้เรียกเห็น (§6 + กันกดพร้อมกัน)
+    /// - ลำดับวิ่งงานเดินต่อภายใน (สาขา + วันที่ส่ง) เดียวกัน (D11)
     /// </summary>
-    public class FakeDeliveryRequestRepository : IDeliveryRequestRepository
+    public class FakeDeliveryRequestRepository : IDeliveryRequestRepository, IRequestWorkflowRepository
     {
         private readonly Dictionary<int, DeliveryRequest> _requests = new Dictionary<int, DeliveryRequest>();
         private readonly Dictionary<string, int> _sequences = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private readonly List<StatusHistoryEntry> _history = new List<StatusHistoryEntry>();
 
         private int _nextReqId = 1;
+        private long _nextHistoryId = 1;
         private long _rowVersionCounter = 1;
+
+        // ---------------- IDeliveryRequestRepository ----------------
 
         public CreatedRequest Create(CreateRequestData data)
         {
@@ -58,42 +64,37 @@ namespace Messenger.UnitTests.Fakes
 
             _requests[reqId] = request;
 
+            AddHistory(reqId, null, RequestStatus.Received, data.CreatedBy, data.RequestDateTime, "สร้างใบแจ้งงาน");
+
             return new CreatedRequest { ReqId = reqId, ReqNo = request.ReqNo };
         }
 
         public DeliveryRequest GetById(int reqId, string branchCode)
         {
-            DeliveryRequest request;
-            if (!_requests.TryGetValue(reqId, out request))
-                return null;
-
-            // BR-6 — ใบงานต่างสาขาต้องมองไม่เห็นเลย
-            if (!string.Equals(request.BranchCode, branchCode, StringComparison.OrdinalIgnoreCase))
-                return null;
-
-            return Clone(request);
+            var request = Find(reqId, branchCode);
+            return request == null ? null : Clone(request);
         }
 
-        public IReadOnlyList<DeliveryRequest> List(string branchCode, string requesterEmpCode,
-                                                   DateTime? sendDateFrom, DateTime? sendDateTo)
+        public IReadOnlyList<DeliveryRequest> List(RequestListFilter filter)
         {
             return _requests.Values
-                .Where(r => string.Equals(r.BranchCode, branchCode, StringComparison.OrdinalIgnoreCase))
-                .Where(r => requesterEmpCode == null ||
-                            string.Equals(r.RequesterEmpCode, requesterEmpCode, StringComparison.OrdinalIgnoreCase))
-                .Where(r => !sendDateFrom.HasValue || r.SendDate >= sendDateFrom.Value)
-                .Where(r => !sendDateTo.HasValue || r.SendDate <= sendDateTo.Value)
+                .Where(r => SameText(r.BranchCode, filter.BranchCode))
+                .Where(r => filter.RequesterEmpCode == null ||
+                            SameText(r.RequesterEmpCode, filter.RequesterEmpCode))
+                .Where(r => !filter.SendDateFrom.HasValue || r.SendDate >= filter.SendDateFrom.Value)
+                .Where(r => !filter.SendDateTo.HasValue || r.SendDate <= filter.SendDateTo.Value)
+                .Where(r => !filter.RequestDateFrom.HasValue || r.RequestDateTime >= filter.RequestDateFrom.Value.Date)
+                .Where(r => !filter.RequestDateTo.HasValue ||
+                            r.RequestDateTime < filter.RequestDateTo.Value.Date.AddDays(1))
+                .Where(r => !filter.Status.HasValue || r.Status == filter.Status.Value)
                 .Select(Clone)
                 .ToList();
         }
 
         public bool Update(UpdateRequestData data)
         {
-            DeliveryRequest request;
-            if (!_requests.TryGetValue(data.ReqId, out request))
-                return false;
-
-            if (!string.Equals(request.BranchCode, data.BranchCode, StringComparison.OrdinalIgnoreCase))
+            var request = Find(data.ReqId, data.BranchCode);
+            if (request == null)
                 return false;
 
             // BR-2 — rowVersion ไม่ตรง แปลว่ามีคนแก้ไปแล้ว
@@ -115,9 +116,96 @@ namespace Messenger.UnitTests.Fakes
             return true;
         }
 
+        // ---------------- IRequestWorkflowRepository ----------------
+
+        public bool ChangeStatus(StatusChangeData data)
+        {
+            var request = Find(data.ReqId, data.BranchCode);
+            if (request == null)
+                return false;
+
+            // สถานะปัจจุบันต้องตรงกับที่ service เห็นตอนตัดสินใจ ไม่งั้นคือมีคนกดตัดหน้า
+            if (request.Status != data.FromStatus)
+                return false;
+
+            request.Status = data.ToStatus;
+            request.RowVersion = NextRowVersion();
+
+            AddHistory(data.ReqId, data.FromStatus, data.ToStatus, data.ByEmpCode, data.ChangedAt, data.Note);
+
+            return true;
+        }
+
+        public MessengerAssignment Confirm(ConfirmAssignmentData data)
+        {
+            var request = Find(data.ReqId, data.BranchCode);
+            if (request == null)
+                return null;
+
+            if (request.Status != RequestStatus.Received)
+                return null;
+
+            // D11 — ลำดับถัดไปของ (สาขา + วันที่ส่ง) เดียวกัน
+            var lastOrder = _requests.Values
+                .Where(r => SameText(r.BranchCode, data.BranchCode))
+                .Where(r => r.SendDate.Date == request.SendDate.Date)
+                .Where(r => r.Assignment != null)
+                .Select(r => r.Assignment.SequenceOrder)
+                .DefaultIfEmpty(0)
+                .Max();
+
+            request.Assignment = new MessengerAssignment
+            {
+                ReqId = data.ReqId,
+                MessengerEmpCode = data.MessengerEmpCode,
+                MessengerName = "พนักงาน " + data.MessengerEmpCode,
+                ConfirmedAt = data.ConfirmedAt,
+                SequenceOrder = lastOrder + 1
+            };
+
+            request.Status = RequestStatus.Delivering;
+            request.RowVersion = NextRowVersion();
+
+            AddHistory(data.ReqId, RequestStatus.Received, RequestStatus.Delivering,
+                       data.ByEmpCode, data.ConfirmedAt, data.Note);
+
+            return CloneAssignment(request.Assignment);
+        }
+
+        public bool SwapSequence(int reqIdA, int reqIdB, string branchCode)
+        {
+            var a = Find(reqIdA, branchCode);
+            var b = Find(reqIdB, branchCode);
+
+            if (a?.Assignment == null || b?.Assignment == null)
+                return false;
+
+            // ลำดับมีความหมายเฉพาะภายในวันเดียวกัน (D11)
+            if (a.SendDate.Date != b.SendDate.Date)
+                return false;
+
+            var temp = a.Assignment.SequenceOrder;
+            a.Assignment.SequenceOrder = b.Assignment.SequenceOrder;
+            b.Assignment.SequenceOrder = temp;
+
+            return true;
+        }
+
+        public IReadOnlyList<StatusHistoryEntry> ListHistory(int reqId, string branchCode)
+        {
+            if (Find(reqId, branchCode) == null)
+                return new List<StatusHistoryEntry>();
+
+            return _history
+                .Where(h => h.ReqId == reqId)
+                .OrderBy(h => h.ChangedAt)
+                .ThenBy(h => h.HistoryId)
+                .ToList();
+        }
+
         // ---------------- ตัวช่วยสำหรับเทสต์ ----------------
 
-        /// <summary>ตั้งสถานะของใบงานโดยตรง (ใช้จำลองว่า Messenger รับงานไปแล้ว)</summary>
+        /// <summary>ตั้งสถานะของใบงานโดยตรง (ใช้จำลองว่ามีคนกดตัดหน้าไปแล้ว)</summary>
         public void SetStatus(int reqId, RequestStatus status)
         {
             _requests[reqId].Status = status;
@@ -137,9 +225,40 @@ namespace Messenger.UnitTests.Fakes
 
         // ---------------- ภายใน ----------------
 
+        private DeliveryRequest Find(int reqId, string branchCode)
+        {
+            DeliveryRequest request;
+            if (!_requests.TryGetValue(reqId, out request))
+                return null;
+
+            // BR-6 — ใบงานต่างสาขาต้องมองไม่เห็นเลย
+            return SameText(request.BranchCode, branchCode) ? request : null;
+        }
+
+        private void AddHistory(int reqId, RequestStatus? from, RequestStatus to,
+                                string byEmpCode, DateTime changedAt, string note)
+        {
+            _history.Add(new StatusHistoryEntry
+            {
+                HistoryId = _nextHistoryId++,
+                ReqId = reqId,
+                FromStatus = from,
+                ToStatus = to,
+                ByEmpCode = byEmpCode,
+                ByName = "พนักงาน " + byEmpCode,
+                ChangedAt = changedAt,
+                Note = note
+            });
+        }
+
         private byte[] NextRowVersion()
         {
             return BitConverter.GetBytes(_rowVersionCounter++);
+        }
+
+        private static bool SameText(string left, string right)
+        {
+            return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool SameRowVersion(byte[] left, byte[] right)
@@ -163,6 +282,24 @@ namespace Messenger.UnitTests.Fakes
                     DetailText = j.DetailText
                 })
                 .ToList();
+        }
+
+        private static MessengerAssignment CloneAssignment(MessengerAssignment source)
+        {
+            if (source == null)
+                return null;
+
+            return new MessengerAssignment
+            {
+                ReqId = source.ReqId,
+                MessengerEmpCode = source.MessengerEmpCode,
+                MessengerName = source.MessengerName,
+                ConfirmedAt = source.ConfirmedAt,
+                SequenceOrder = source.SequenceOrder,
+                Route = source.Route,
+                DistanceKm = source.DistanceKm,
+                ReturnToOffice = source.ReturnToOffice
+            };
         }
 
         private static DeliveryRequest Clone(DeliveryRequest source)
@@ -189,7 +326,8 @@ namespace Messenger.UnitTests.Fakes
                 CreatedAt = source.CreatedAt,
                 UpdatedBy = source.UpdatedBy,
                 UpdatedAt = source.UpdatedAt,
-                JobTypes = CloneJobTypes(source.JobTypes, source.ReqId)
+                JobTypes = CloneJobTypes(source.JobTypes, source.ReqId),
+                Assignment = CloneAssignment(source.Assignment)
             };
         }
     }

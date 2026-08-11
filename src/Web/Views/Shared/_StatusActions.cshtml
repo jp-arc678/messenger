@@ -1,0 +1,77 @@
+@model StatusActionsViewModel
+@*
+    ปุ่มเปลี่ยนสถานะของใบงาน 1 ใบ (§6)
+
+    ปุ่มที่ต้องระบุเหตุผลจะกางช่องกรอกออกมาใต้ปุ่ม (collapse) แทนการใช้ modal
+    เพราะ partial นี้ถูกวางซ้ำหลายใบในหน้าคิวงาน การกางในที่เดิมอ่านง่ายกว่า
+    และไม่มีปัญหาเรื่องการซ้อนชั้นเมื่ออยู่ในตาราง/การ์ด
+*@
+@if (Model.Actions != null && Model.Actions.Count > 0)
+{
+    <div class="d-flex flex-wrap gap-2">
+        @foreach (var transition in Model.Actions)
+        {
+            var collapseId = string.Format("reason-{0}-{1}", Model.ReqId, (int)transition.Action);
+
+            if (transition.ReasonRequired)
+            {
+                <button type="button" class="btn @StatusActionsViewModel.ButtonClass(transition.Action)@Model.ButtonSizeClass"
+                        data-bs-toggle="collapse" data-bs-target="#@collapseId"
+                        aria-expanded="false" aria-controls="@collapseId">
+                    @transition.DisplayName
+                </button>
+            }
+            else
+            {
+                using (Html.BeginForm("ChangeStatus", "Requests", FormMethod.Post))
+                {
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@Model.ReqId" />
+                    <input type="hidden" name="statusAction" value="@transition.Action" />
+                    <input type="hidden" name="returnTo" value="@Model.ReturnTo" />
+                    <input type="hidden" name="queueDate" value="@Model.QueueDate" />
+                    <button type="submit" class="btn @StatusActionsViewModel.ButtonClass(transition.Action)@Model.ButtonSizeClass">
+                        @transition.DisplayName
+                    </button>
+                }
+            }
+        }
+    </div>
+
+    @* ช่องกรอกเหตุผลของปุ่มที่บังคับเหตุผล (§6 : พักการส่ง และยกเลิกหลังเริ่มส่งแล้ว) *@
+    foreach (var transition in Model.Actions.Where(t => t.ReasonRequired))
+    {
+        var collapseId = string.Format("reason-{0}-{1}", Model.ReqId, (int)transition.Action);
+        var fieldId = collapseId + "-text";
+
+        <div class="collapse mt-2" id="@collapseId">
+            <div class="card card-body py-2">
+                @using (Html.BeginForm("ChangeStatus", "Requests", FormMethod.Post))
+                {
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@Model.ReqId" />
+                    <input type="hidden" name="statusAction" value="@transition.Action" />
+                    <input type="hidden" name="returnTo" value="@Model.ReturnTo" />
+                    <input type="hidden" name="queueDate" value="@Model.QueueDate" />
+
+                    <label class="form-label small mb-1" for="@fieldId">
+                        เหตุผลของการ@(transition.DisplayName) <span class="text-danger">*</span>
+                    </label>
+                    <textarea class="form-control form-control-sm" id="@fieldId" name="reason"
+                              rows="2" maxlength="500" required
+                              placeholder="เช่น ผู้รับไม่อยู่ / เอกสารไม่ครบ"></textarea>
+
+                    <div class="d-flex gap-2 mt-2">
+                        <button type="submit" class="btn btn-sm @StatusActionsViewModel.ButtonClass(transition.Action)">
+                            ยืนยัน@(transition.DisplayName)
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                data-bs-toggle="collapse" data-bs-target="#@collapseId">
+                            ยกเลิก
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}

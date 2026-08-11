@@ -4,6 +4,7 @@ using System.Linq;
 using System.Web.Mvc;
 using Messenger.Application.Services;
 using Messenger.Domain.Entities;
+using Messenger.Domain.Workflow;
 using Messenger.Web.ViewModels;
 
 namespace Messenger.Web.Controllers
@@ -18,27 +19,40 @@ namespace Messenger.Web.Controllers
     public class RequestsController : BaseController
     {
         private readonly IDeliveryRequestService _service;
+        private readonly IRequestWorkflowService _workflow;
 
-        public RequestsController(IDeliveryRequestService service)
+        public RequestsController(IDeliveryRequestService service, IRequestWorkflowService workflow)
         {
             _service = service ?? throw new ArgumentNullException(nameof(service));
+            _workflow = workflow ?? throw new ArgumentNullException(nameof(workflow));
         }
 
         [HttpGet]
-        public ActionResult Index(string sendDateFrom, string sendDateTo)
+        public ActionResult Index(string sendDateFrom, string sendDateTo,
+                                  string requestDateFrom, string requestDateTo, string status)
         {
-            var from = RequestFormViewModel.ParseDate(sendDateFrom);
-            var to = RequestFormViewModel.ParseDate(sendDateTo);
+            var query = new RequestListQuery
+            {
+                SendDateFrom = RequestFormViewModel.ParseDate(sendDateFrom),
+                SendDateTo = RequestFormViewModel.ParseDate(sendDateTo),
+                RequestDateFrom = RequestFormViewModel.ParseDate(requestDateFrom),
+                RequestDateTo = RequestFormViewModel.ParseDate(requestDateTo),
+                Status = RequestListViewModel.ParseStatus(status)
+            };
 
             var model = new RequestListViewModel
             {
-                Requests = _service.List(CurrentUser, from, to),
+                Requests = _service.List(CurrentUser, query),
                 SendDateFrom = sendDateFrom,
                 SendDateTo = sendDateTo,
+                RequestDateFrom = requestDateFrom,
+                RequestDateTo = requestDateTo,
+                Status = status,
                 SeesWholeBranch = CurrentUser.IsAdmin || CurrentUser.IsMessenger,
                 BranchCode = CurrentUser.BranchCode,
                 BranchName = CurrentUser.BranchName,
-                Message = TempData["Message"] as string
+                Message = TempData["Message"] as string,
+                ErrorMessage = TempData["Error"] as string
             };
 
             return View(model);
@@ -51,8 +65,47 @@ namespace Messenger.Web.Controllers
             if (!result.Success)
                 return HttpNotFoundWithMessage(result.FirstError);
 
-            ViewBag.CanEdit = _service.CanEdit(result.Value, CurrentUser);
-            return View(result.Value);
+            var history = _workflow.GetHistory(id, CurrentUser);
+
+            var model = new RequestDetailsViewModel
+            {
+                Request = result.Value,
+                CanEdit = _service.CanEdit(result.Value, CurrentUser),
+                Actions = _workflow.AvailableActions(result.Value, CurrentUser),
+                History = history.Success ? history.Value : new List<StatusHistoryEntry>(),
+                Message = TempData["Message"] as string,
+                ErrorMessage = TempData["Error"] as string
+            };
+
+            return View(model);
+        }
+
+        /// <summary>
+        /// เปลี่ยนสถานะใบงาน 1 ครั้ง (§6) — ใช้ร่วมกันทั้งหน้ารายละเอียดและหน้าคิวงาน
+        ///
+        /// controller ไม่ตัดสินอะไรเลยว่าเปลี่ยนได้ไหม ส่งต่อให้ service ทั้งหมด
+        /// แล้วแปลงผลลัพธ์เป็นข้อความบนหน้าจอเท่านั้น
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public ActionResult ChangeStatus(int id, RequestAction statusAction, string reason,
+                                         string returnTo, string queueDate)
+        {
+            var result = _workflow.Apply(id, statusAction, reason, CurrentUser);
+
+            if (result.Success)
+            {
+                TempData["Message"] = $"{ActionName(statusAction)}ใบแจ้งงาน {result.Value.ReqNo} เรียบร้อยแล้ว";
+            }
+            else
+            {
+                TempData["Error"] = string.Join(" · ", result.Errors);
+            }
+
+            if (string.Equals(returnTo, "queue", StringComparison.OrdinalIgnoreCase))
+                return RedirectToAction("Index", "Queue", new { date = queueDate });
+
+            return RedirectToAction("Details", new { id });
         }
 
         [HttpGet]
@@ -150,6 +203,15 @@ namespace Messenger.Web.Controllers
         }
 
         // ---------------- helpers ----------------
+
+        /// <summary>ชื่อการกระทำสำหรับข้อความยืนยัน — อ่านจากตาราง §6 ที่เดียว</summary>
+        private static string ActionName(RequestAction action)
+        {
+            return RequestStateMachine.All
+                       .Where(t => t.Action == action)
+                       .Select(t => t.DisplayName)
+                       .FirstOrDefault() ?? "เปลี่ยนสถานะ";
+        }
 
         private RequestFormViewModel ToForm(DeliveryRequest request)
         {

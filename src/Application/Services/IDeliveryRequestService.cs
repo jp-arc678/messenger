@@ -62,6 +62,28 @@ namespace Messenger.Application.Services
     }
 
     /// <summary>
+    /// เงื่อนไขค้นหาที่มาจากหน้าจอ
+    ///
+    /// ไม่มีช่อง "สาขา" และ "ผู้แจ้ง" โดยตั้งใจ — สองค่านี้ service เป็นคนเติมเอง
+    /// จาก UserContext ตาม BR-6 + §5 ถ้าเปิดให้หน้าจอส่งมาได้ ผู้ใช้จะแก้ querystring
+    /// เพื่อดูข้อมูลสาขาอื่นได้ทันที
+    /// </summary>
+    public class RequestListQuery
+    {
+        public DateTime? SendDateFrom { get; set; }
+
+        public DateTime? SendDateTo { get; set; }
+
+        /// <summary>ช่วง "วันที่บันทึก" — คนละอย่างกับวันที่ส่ง</summary>
+        public DateTime? RequestDateFrom { get; set; }
+
+        public DateTime? RequestDateTo { get; set; }
+
+        /// <summary>null = ทุกสถานะ</summary>
+        public RequestStatus? Status { get; set; }
+    }
+
+    /// <summary>
     /// Business logic ทั้งหมดของใบแจ้งงาน — BR-1, BR-2, BR-6, BR-8 และ D15–D18
     /// Controller มีหน้าที่แค่แปลงฟอร์มเป็น command แล้วเรียก service นี้
     /// </summary>
@@ -81,7 +103,7 @@ namespace Messenger.Application.Services
         ServiceResult<DeliveryRequest> Get(int reqId, UserContext user);
 
         /// <summary>รายการใบงานที่ผู้ใช้คนนี้มีสิทธิ์เห็น (§5 + BR-6)</summary>
-        IReadOnlyList<DeliveryRequest> List(UserContext user, DateTime? sendDateFrom, DateTime? sendDateTo);
+        IReadOnlyList<DeliveryRequest> List(UserContext user, RequestListQuery query);
 
         /// <summary>ผู้ใช้คนนี้แก้ใบงานนี้ได้หรือไม่ ตาม BR-2 + §5</summary>
         bool CanEdit(DeliveryRequest request, UserContext user);

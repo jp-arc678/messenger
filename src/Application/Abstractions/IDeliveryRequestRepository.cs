@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Messenger.Domain.Entities;
+using Messenger.Domain.Enums;
 
 namespace Messenger.Application.Abstractions
 {
@@ -71,6 +72,32 @@ namespace Messenger.Application.Abstractions
         public IReadOnlyList<RequestJobType> JobTypes { get; set; }
     }
 
+    /// <summary>
+    /// เงื่อนไขการดึงรายการใบแจ้งงาน
+    ///
+    /// <see cref="BranchCode"/> และ <see cref="RequesterEmpCode"/> ถูกกำหนดโดย
+    /// service layer จาก UserContext เท่านั้น (BR-6 + §5) — ห้ามรับมาจากหน้าจอ
+    /// </summary>
+    public class RequestListFilter
+    {
+        public string BranchCode { get; set; }
+
+        /// <summary>null = ทั้งสาขา (Admin/Messenger) · มีค่า = เฉพาะใบของคนนั้น (User)</summary>
+        public string RequesterEmpCode { get; set; }
+
+        public DateTime? SendDateFrom { get; set; }
+
+        public DateTime? SendDateTo { get; set; }
+
+        /// <summary>ช่วง "วันที่บันทึก" (เทียบเฉพาะส่วนวันที่ ไม่คิดเวลา)</summary>
+        public DateTime? RequestDateFrom { get; set; }
+
+        public DateTime? RequestDateTo { get; set; }
+
+        /// <summary>null = ทุกสถานะ</summary>
+        public RequestStatus? Status { get; set; }
+    }
+
     /// <summary>ผลลัพธ์การสร้างใบแจ้งงาน</summary>
     public class CreatedRequest
     {
@@ -98,12 +125,10 @@ namespace Messenger.Application.Abstractions
         DeliveryRequest GetById(int reqId, string branchCode);
 
         /// <summary>
-        /// รายการใบงานของสาขา
-        /// ส่ง <paramref name="requesterEmpCode"/> = null เพื่อดูทั้งสาขา
+        /// รายการใบงานตามเงื่อนไขที่ service layer ประกอบมาให้
         /// (ผู้เรียกเป็นคนตัดสินตามสิทธิ์ ไม่ใช่ repository)
         /// </summary>
-        IReadOnlyList<DeliveryRequest> List(string branchCode, string requesterEmpCode,
-                                            DateTime? sendDateFrom, DateTime? sendDateTo);
+        IReadOnlyList<DeliveryRequest> List(RequestListFilter filter);
 
         /// <summary>
         /// แก้ไขใบงาน — คืน false เมื่อไม่มีแถวถูกอัปเดต

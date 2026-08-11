@@ -160,20 +160,26 @@ namespace Messenger.Infrastructure.Repositories
         /// หมายเหตุ : รายการนี้ "ไม่" ดึงประเภทงานมาด้วย เพื่อเลี่ยง query แบบ N+1
         /// หน้าจอที่ต้องเห็นประเภทงานให้เปิดดูรายใบผ่าน <see cref="GetById"/>
         /// </summary>
-        public IReadOnlyList<DeliveryRequest> List(string branchCode, string requesterEmpCode,
-                                                   DateTime? sendDateFrom, DateTime? sendDateTo)
+        public IReadOnlyList<DeliveryRequest> List(RequestListFilter filter)
         {
-            if (string.IsNullOrWhiteSpace(branchCode))
-                throw new ArgumentException("ต้องระบุรหัสสาขา (BR-6)", nameof(branchCode));
+            if (filter == null)
+                throw new ArgumentNullException(nameof(filter));
+
+            if (string.IsNullOrWhiteSpace(filter.BranchCode))
+                throw new ArgumentException("ต้องระบุรหัสสาขา (BR-6)", nameof(filter));
 
             using (var connection = _connectionFactory.CreateConnection())
             {
                 var parameters = new DynamicParameters();
-                parameters.Add("BranchCode", branchCode);
+                parameters.Add("BranchCode", filter.BranchCode);
                 parameters.Add("RequesterEmpCode",
-                    string.IsNullOrWhiteSpace(requesterEmpCode) ? null : requesterEmpCode.Trim());
-                parameters.Add("SendDateFrom", sendDateFrom?.Date, DbType.Date);
-                parameters.Add("SendDateTo", sendDateTo?.Date, DbType.Date);
+                    string.IsNullOrWhiteSpace(filter.RequesterEmpCode) ? null : filter.RequesterEmpCode.Trim());
+                parameters.Add("SendDateFrom", filter.SendDateFrom?.Date, DbType.Date);
+                parameters.Add("SendDateTo", filter.SendDateTo?.Date, DbType.Date);
+                parameters.Add("RequestDateFrom", filter.RequestDateFrom?.Date, DbType.Date);
+                parameters.Add("RequestDateTo", filter.RequestDateTo?.Date, DbType.Date);
+                parameters.Add("Status",
+                    filter.Status.HasValue ? RequestStatuses.ToCode(filter.Status.Value) : null);
 
                 var rows = connection.Query<DeliveryRequestRow>(
                     "dbo.spDeliveryRequestList", parameters,

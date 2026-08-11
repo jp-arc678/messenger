@@ -33,6 +33,13 @@
                         <li class="nav-item">
                             <a class="nav-link" href="@Url.Action("Create", "Requests")">แจ้งงานใหม่</a>
                         </li>
+                        @* §5 — คิวงานของสาขาเปิดให้เฉพาะ Messenger/Admin *@
+                        @if (currentUser.IsMessenger || currentUser.IsAdmin)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" href="@Url.Action("Index", "Queue")">คิวงานประจำวัน</a>
+                            </li>
+                        }
                     </ul>
                     <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
                         <li class="nav-item">
