@@ -20,6 +20,14 @@ namespace Messenger.Application.Services
 
         public IReadOnlyList<string> Errors { get; private set; } = NoErrors;
 
+        /// <summary>
+        /// เรื่องที่ผู้ใช้ควรรู้ แต่ไม่ได้ทำให้ operation ล้มเหลว
+        /// เช่น ปิดงานสำเร็จแล้วแต่ส่งอีเมลแจ้งผู้แจ้งไม่ออก (D26)
+        /// </summary>
+        public IReadOnlyList<string> Warnings { get; private set; } = NoErrors;
+
+        public bool HasWarnings => Warnings.Count > 0;
+
         /// <summary>true เมื่อมีคนอื่นแก้ใบงานนี้ไปแล้วระหว่างที่เรากรอกฟอร์ม (BR-2)</summary>
         public bool IsConcurrencyConflict { get; private set; }
 
@@ -28,6 +36,19 @@ namespace Messenger.Application.Services
         public static ServiceResult<T> Ok(T value)
         {
             return new ServiceResult<T> { Success = true, Value = value };
+        }
+
+        /// <summary>สำเร็จ แต่มีเรื่องที่ต้องบอกผู้ใช้ด้วย</summary>
+        public static ServiceResult<T> OkWithWarnings(T value, IEnumerable<string> warnings)
+        {
+            var list = warnings == null ? new string[0] : warnings.Where(w => !string.IsNullOrWhiteSpace(w)).ToArray();
+
+            return new ServiceResult<T>
+            {
+                Success = true,
+                Value = value,
+                Warnings = list
+            };
         }
 
         public static ServiceResult<T> Fail(params string[] errors)

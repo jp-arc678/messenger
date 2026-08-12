@@ -86,7 +86,16 @@ SELECT
     a.SequenceOrder,
     a.Route,
     a.DistanceKm,
-    a.ReturnToOffice
+    a.ReturnToOffice,
+    -- รหัสประเภทงานทั้งหมดของใบงาน คั่นด้วยจุลภาค เช่น 'SendDoc,ReceiveDoc'
+    -- ใช้กับหน้ารายงาน/export ที่ต้องการประเภทงานโดยไม่ต้อง query ทีละใบ (กัน N+1)
+    -- SQL Server 2014 ยังไม่มี STRING_AGG จึงต้องใช้ FOR XML PATH
+    -- (รหัสเป็น ASCII ล้วนตาม CHECK constraint จึงไม่มีปัญหาเรื่อง escape)
+    STUFF((SELECT ',' + j.JobType
+           FROM dbo.tblRequestJobType AS j
+           WHERE j.ReqId = r.ReqId
+           ORDER BY j.ReqJobTypeId
+           FOR XML PATH(''), TYPE).value('.', 'VARCHAR(200)'), 1, 1, '') AS JobTypeCodes
 FROM dbo.tblDeliveryRequest AS r
 INNER JOIN dbo.tblBranch AS b
         ON b.BranchCode = r.BranchCode

@@ -56,6 +56,22 @@ namespace Messenger.Application.Services
             return SignInResult.Ok(ToUserContext(employee));
         }
 
+        public UserContext ResolveCurrent(string empCode)
+        {
+            if (string.IsNullOrWhiteSpace(empCode))
+                return null;
+
+            var employee = _employees.GetByEmpCode(empCode.Trim());
+            if (employee == null || !employee.IsActive)
+                return null;
+
+            // สาขาที่ถูกปิดใช้งานถือว่าเข้าระบบไม่ได้เช่นกัน (BR-6)
+            if (!IsKnownBranch(employee.BranchCode))
+                return null;
+
+            return ToUserContext(employee);
+        }
+
         public IReadOnlyList<SsoUserInfo> ListSelectableUsers()
         {
             return _sso.ListKnownUsers();

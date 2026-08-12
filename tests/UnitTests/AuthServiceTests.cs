@@ -113,5 +113,60 @@ namespace Messenger.UnitTests
             Assert.That(result.Success, Is.True, result.ErrorMessage);
             Assert.That(result.User.EmpCode, Is.EqualTo("10003"));
         }
+
+        // ==================== Phase 6 : สาขา/สิทธิ์ต้องมาจาก DB เสมอ ====================
+
+        [Test]
+        public void ResolveCurrent_ต้องได้สาขาและสิทธิ์ล่าสุดจาก_DB()
+        {
+            // จำลองว่า Admin เพิ่งย้ายพนักงานคนนี้ไปสาขา SBK และเปลี่ยน role เป็น Messenger
+            // หลังจากที่เจ้าตัว login ค้างไว้ด้วยข้อมูลเดิม
+            var employees = new FakeEmployeeRepository().WithEmployee("10002", "SBK", "M");
+
+            var user = BuildService(new FakeSsoClient(), employees).ResolveCurrent("10002");
+
+            Assert.That(user, Is.Not.Null);
+            Assert.That(user.BranchCode, Is.EqualTo("SBK"));
+            Assert.That(user.Role, Is.EqualTo(Role.Messenger));
+        }
+
+        [Test]
+        public void ResolveCurrent_คนที่ถูกปิดการใช้งานต้องใช้ระบบต่อไม่ได้()
+        {
+            var employees = new FakeEmployeeRepository().WithEmployee("10002", "SDC", "U", isActive: false);
+
+            Assert.That(BuildService(new FakeSsoClient(), employees).ResolveCurrent("10002"), Is.Null);
+        }
+
+        [Test]
+        public void ResolveCurrent_คนที่ไม่มีในระบบแล้วต้องใช้ระบบต่อไม่ได้()
+        {
+            Assert.That(BuildService(new FakeSsoClient(), new FakeEmployeeRepository()).ResolveCurrent("99999"),
+                Is.Null);
+        }
+
+        [Test]
+        public void ResolveCurrent_สาขาที่ถูกปิดใช้งานต้องใช้ระบบต่อไม่ได้()
+        {
+            // BR-6 — สาขาถูกปิด = ทุกคนในสาขานั้นเข้าระบบไม่ได้
+            var employees = new FakeEmployeeRepository().WithEmployee("30001", "XXX");
+
+            var user = BuildService(new FakeSsoClient(), employees, new FakeBranchRepository("SDC", "SBK"))
+                .ResolveCurrent("30001");
+
+            Assert.That(user, Is.Null);
+        }
+
+        [Test]
+        public void ResolveCurrent_ต้องไม่เรียก_SSO_ซ้ำทุก_request()
+        {
+            // ถ้าเผลอไปถาม SSO ทุก request ระบบจะช้าและพึ่งพา SSO เกินจำเป็น
+            var sso = new FakeSsoClient().Add("10002", "SDC");
+            var employees = new FakeEmployeeRepository().WithEmployee("10002", "SDC");
+
+            BuildService(sso, employees).ResolveCurrent("10002");
+
+            Assert.That(employees.UpsertCallCount, Is.EqualTo(0));
+        }
     }
 }

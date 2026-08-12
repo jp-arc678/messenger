@@ -22,6 +22,7 @@ namespace Messenger.Application.Services
     /// - BR-6 อ่าน/เขียนด้วย branchCode ของผู้ใช้เสมอ ใบงานต่างสาขาจะหาไม่เจอตั้งแต่ต้น
     /// - BR-4 ใบที่มีประเภทงาน "รับเอกสาร" ต้องกดยืนยันรับของก่อนจึงปิดงานได้
     ///        (ไม่บังคับว่าต้องมีรูป ตาม D9)
+    /// - BR-5 ปิดงานแล้วส่งอีเมลแจ้งผู้แจ้ง — ส่งไม่ออกก็ไม่ย้อนสถานะ (D26)
     /// </summary>
     public class RequestWorkflowService : IRequestWorkflowService
     {
@@ -31,16 +32,19 @@ namespace Messenger.Application.Services
         private readonly IDeliveryRequestRepository _requests;
         private readonly IRequestWorkflowRepository _workflow;
         private readonly IEmployeeRepository _employees;
+        private readonly IRequestNotificationService _notifications;
         private readonly IClock _clock;
 
         public RequestWorkflowService(IDeliveryRequestRepository requests,
                                       IRequestWorkflowRepository workflow,
                                       IEmployeeRepository employees,
+                                      IRequestNotificationService notifications,
                                       IClock clock)
         {
             _requests = requests ?? throw new ArgumentNullException(nameof(requests));
             _workflow = workflow ?? throw new ArgumentNullException(nameof(workflow));
             _employees = employees ?? throw new ArgumentNullException(nameof(employees));
+            _notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         }
 
@@ -315,7 +319,21 @@ namespace Messenger.Application.Services
             if (!changed)
                 return ServiceResult<DeliveryRequest>.Conflict(RaceLostMessage(transition));
 
-            return Reload(request.ReqId, user);
+            var reloaded = Reload(request.ReqId, user);
+
+            // BR-5 — จบ process แล้วแจ้งผู้แจ้งทางอีเมล
+            // ทำ "หลัง" เปลี่ยนสถานะสำเร็จเสมอ และความล้มเหลวของเมลกลายเป็นแค่คำเตือน (D26)
+            if (transition.To == RequestStatus.Completed && reloaded.Success)
+            {
+                var notification = _notifications.NotifyCompleted(reloaded.Value);
+                if (!string.IsNullOrWhiteSpace(notification.Warning))
+                {
+                    return ServiceResult<DeliveryRequest>.OkWithWarnings(
+                        reloaded.Value, new[] { notification.Warning });
+                }
+            }
+
+            return reloaded;
         }
 
         /// <summary>

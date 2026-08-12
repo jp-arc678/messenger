@@ -77,6 +77,25 @@ WHERE EXISTS (SELECT 1 FROM MessengerDb.dbo.tblRequestJobType AS j
 ORDER BY r.ReqId;
 '@
 
+Write-Host ''
+Write-Host '=== อีเมลที่ระบบเขียนไว้ (BR-5 · โหมด pickup directory ตอน dev) ===' -ForegroundColor Cyan
+$mailFolder = Join-Path (Split-Path -Parent $PSScriptRoot) 'src\Web\App_Data\Mail'
+if (Test-Path $mailFolder) {
+    $mails = Get-ChildItem "$mailFolder\*.eml" -ErrorAction SilentlyContinue
+    if ($mails) {
+        $mails | Sort-Object LastWriteTime | ForEach-Object {
+            $header = (Get-Content $_.FullName -Raw -Encoding UTF8 -ErrorAction SilentlyContinue) -split "`r`n`r`n", 2
+            $to = if ($header[0] -match 'To:\s*(.+)') { $Matches[1].Trim() } else { '?' }
+            $cc = if ($header[0] -match 'CC:\s*(.+)') { $Matches[1].Trim() } else { '-' }
+            Write-Host ("   {0:yyyy-MM-dd HH:mm}  To={1}  CC={2}" -f $_.LastWriteTime, $to, $cc)
+        }
+    } else {
+        Write-Host '   (ยังไม่มีไฟล์ .eml — ยังไม่มีใบงานไหนถูกปิด)'
+    }
+} else {
+    Write-Host '   (ยังไม่มีโฟลเดอร์ ' + $mailFolder + ')'
+}
+
 Invoke-Sql 'ผลลัพธ์จริงของ spDeliveryRequestList : สาขา SDC ทั้งสาขา' @'
 EXEC MessengerDb.dbo.spDeliveryRequestList @BranchCode = 'SDC';
 '@

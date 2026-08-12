@@ -1,0 +1,67 @@
+Subject: [ปิดงาน] ใบแจ้งงาน {{ReqNo}} — {{ContactName}}
+
+<!--
+    Template อีเมลแจ้งผู้แจ้งเมื่อปิดงาน (BR-5 · D28)
+
+    วิธีใช้ :
+    - บรรทัดแรกที่ขึ้นต้นด้วย "Subject:" คือหัวเรื่อง (ตัดออกจากเนื้อความให้อัตโนมัติ)
+      ถ้าลบบรรทัดนี้ทิ้ง ระบบจะใช้หัวเรื่องมาตรฐานแทน
+    - ตัวแปรเขียนในรูป {{ชื่อ}} · ค่าทุกตัวถูก HTML-encode ให้แล้ว
+    - แก้ไฟล์นี้แล้วมีผลทันที ไม่ต้อง build ใหม่ (ลบไฟล์ = กลับไปใช้ template ในโค้ด)
+
+    ตัวแปรที่ใช้ได้ :
+    {{ReqNo}} {{BranchCode}} {{BranchName}} {{RequesterName}} {{RequesterEmpCode}}
+    {{ContactName}} {{Phone}} {{Address}} {{Detail}} {{JobTypes}}
+    {{SendDate}} {{CompletedAt}} {{MessengerName}}
+-->
+<div style="font-family: Tahoma, Arial, sans-serif; font-size: 14px; color: #212529;">
+
+    <p>เรียน คุณ{{RequesterName}}</p>
+
+    <p>ใบแจ้งงานรับ-ส่งเอกสารของท่านดำเนินการเสร็จเรียบร้อยแล้ว</p>
+
+    <table cellpadding="8" cellspacing="0"
+           style="border-collapse: collapse; border: 1px solid #dee2e6; min-width: 480px;">
+        <tr style="background-color: #f8f9fa;">
+            <td style="border: 1px solid #dee2e6;"><b>เลขใบงาน</b></td>
+            <td style="border: 1px solid #dee2e6;">{{ReqNo}}</td>
+        </tr>
+        <tr>
+            <td style="border: 1px solid #dee2e6;"><b>สาขา</b></td>
+            <td style="border: 1px solid #dee2e6;">{{BranchCode}} — {{BranchName}}</td>
+        </tr>
+        <tr style="background-color: #f8f9fa;">
+            <td style="border: 1px solid #dee2e6;"><b>ประเภทงาน</b></td>
+            <td style="border: 1px solid #dee2e6;">{{JobTypes}}</td>
+        </tr>
+        <tr>
+            <td style="border: 1px solid #dee2e6;"><b>ผู้ติดต่อ</b></td>
+            <td style="border: 1px solid #dee2e6;">{{ContactName}} {{Phone}}</td>
+        </tr>
+        <tr style="background-color: #f8f9fa;">
+            <td style="border: 1px solid #dee2e6;"><b>ที่อยู่</b></td>
+            <td style="border: 1px solid #dee2e6;">{{Address}}</td>
+        </tr>
+        <tr>
+            <td style="border: 1px solid #dee2e6;"><b>รายละเอียดงาน</b></td>
+            <td style="border: 1px solid #dee2e6;">{{Detail}}</td>
+        </tr>
+        <tr style="background-color: #f8f9fa;">
+            <td style="border: 1px solid #dee2e6;"><b>วันที่ส่ง</b></td>
+            <td style="border: 1px solid #dee2e6;">{{SendDate}}</td>
+        </tr>
+        <tr>
+            <td style="border: 1px solid #dee2e6;"><b>ผู้รับงาน</b></td>
+            <td style="border: 1px solid #dee2e6;">{{MessengerName}}</td>
+        </tr>
+        <tr style="background-color: #f8f9fa;">
+            <td style="border: 1px solid #dee2e6;"><b>ปิดงานเมื่อ</b></td>
+            <td style="border: 1px solid #dee2e6;">{{CompletedAt}}</td>
+        </tr>
+    </table>
+
+    <p style="color: #6c757d; font-size: 12px; margin-top: 20px;">
+        อีเมลฉบับนี้ส่งจากระบบแจ้งงานรับ-ส่งเอกสารโดยอัตโนมัติ กรุณาอย่าตอบกลับ
+    </p>
+
+</div>

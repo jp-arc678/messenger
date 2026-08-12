@@ -28,9 +28,18 @@ namespace Messenger.Web.Controllers
         }
 
         [HttpGet]
-        public ActionResult Login(string returnUrl)
+        public ActionResult Login(string returnUrl, string reason)
         {
-            return View(NewLoginModel(returnUrl));
+            var model = NewLoginModel(returnUrl);
+
+            // ถูกไล่ออกจากระบบกลางคันเพราะข้อมูลพนักงานถูกปิด/ถูกลบ (Phase 6)
+            if (string.Equals(reason, "inactive", StringComparison.OrdinalIgnoreCase))
+            {
+                model.ErrorMessage = "บัญชีของคุณถูกปิดการใช้งาน หรือข้อมูลพนักงานถูกเปลี่ยนแปลง " +
+                                     "กรุณาเข้าสู่ระบบใหม่อีกครั้ง";
+            }
+
+            return View(model);
         }
 
         [HttpPost]

@@ -7,6 +7,8 @@ using System.Web.Mvc;
 using Messenger.Application.Abstractions;
 using Messenger.Application.Services;
 using Messenger.Infrastructure.Data;
+using Messenger.Infrastructure.Email;
+using Messenger.Infrastructure.Export;
 using Messenger.Infrastructure.Repositories;
 using Messenger.Infrastructure.Sso;
 using Messenger.Infrastructure.Storage;
@@ -25,6 +27,15 @@ namespace Messenger.Web.Composition
         /// <summary>ชื่อ appSetting ที่ชี้โฟลเดอร์เก็บไฟล์รูป (D25)</summary>
         public const string PhotoStorageRootSetting = "PhotoStorageRoot";
 
+        // ---- อีเมล (BR-5 · D28) ----
+        public const string EmailFromSetting = "EmailFrom";
+        public const string EmailFromNameSetting = "EmailFromName";
+        public const string EmailPickupDirectorySetting = "EmailPickupDirectory";
+        public const string EmailTemplateFolderSetting = "EmailTemplateFolder";
+
+        /// <summary>ค่าที่ใส่ใน EmailPickupDirectory เพื่อบอกว่า "ส่งจริงผ่าน SMTP"</summary>
+        private const string NoPickupDirectory = "none";
+
         public static IDependencyResolver Build()
         {
             var connectionString = ReadConnectionString();
@@ -39,6 +50,14 @@ namespace Messenger.Web.Composition
             IDeliveryPhotoRepository photoRepository = new DeliveryPhotoRepository(connectionFactory);
             IPhotoFileStorage photoStorage = new PhotoFileStorage(ResolvePhotoStorageRoot());
 
+            // BR-5 + D28 — dev เขียนไฟล์ .eml, production ส่งผ่าน SMTP ตาม mailSettings
+            IEmailSender emailSender = new SmtpEmailSender(
+                fromAddress: ConfigurationManager.AppSettings[EmailFromSetting] ?? "messenger-noreply@localhost",
+                fromDisplayName: ConfigurationManager.AppSettings[EmailFromNameSetting],
+                pickupDirectory: ResolveEmailPickupDirectory());
+
+            IEmailTemplateSource emailTemplates = new FileEmailTemplateSource(ResolveEmailTemplateFolder());
+
             // D3 — SSO ยังเป็น stub ในเฟส 0 เมื่อได้ contract จริงให้สลับบรรทัดนี้บรรทัดเดียว
             ISsoClient sso = new MockSsoClient();
 
@@ -46,9 +65,13 @@ namespace Messenger.Web.Composition
 
             IAuthService authService = new AuthService(sso, employees, branches);
             IDeliveryRequestService requestService = new DeliveryRequestService(requests, employees, clock);
+            IRequestNotificationService notificationService =
+                new RequestNotificationService(emailSender, emailTemplates, employees, clock);
             IRequestWorkflowService workflowService =
-                new RequestWorkflowService(requests, workflowRepository, employees, clock);
+                new RequestWorkflowService(requests, workflowRepository, employees, notificationService, clock);
             IPhotoService photoService = new PhotoService(photoRepository, requests, photoStorage, clock);
+            IReportService reportService = new ReportService(requests, clock);
+            IReportExporter reportExporter = new ExcelReportExporter();
 
             var factories = new Dictionary<Type, Func<object>>
             {
@@ -59,19 +82,25 @@ namespace Messenger.Web.Composition
                 { typeof(IRequestWorkflowRepository), () => workflowRepository },
                 { typeof(IDeliveryPhotoRepository), () => photoRepository },
                 { typeof(IPhotoFileStorage), () => photoStorage },
+                { typeof(IEmailSender), () => emailSender },
+                { typeof(IEmailTemplateSource), () => emailTemplates },
+                { typeof(IRequestNotificationService), () => notificationService },
                 { typeof(ISsoClient), () => sso },
                 { typeof(IClock), () => clock },
                 { typeof(IAuthService), () => authService },
                 { typeof(IDeliveryRequestService), () => requestService },
                 { typeof(IRequestWorkflowService), () => workflowService },
                 { typeof(IPhotoService), () => photoService },
+                { typeof(IReportService), () => reportService },
+                { typeof(IReportExporter), () => reportExporter },
 
                 // controller ที่มี dependency ต้องลงทะเบียนไว้
                 // (controller ที่ไม่มี dependency ปล่อยให้ MVC สร้างเองได้)
                 { typeof(AccountController), () => new AccountController(authService) },
                 { typeof(RequestsController), () => new RequestsController(requestService, workflowService, photoService) },
                 { typeof(QueueController), () => new QueueController(workflowService, clock) },
-                { typeof(PhotosController), () => new PhotosController(photoService) }
+                { typeof(PhotosController), () => new PhotosController(photoService) },
+                { typeof(ReportsController), () => new ReportsController(reportService, reportExporter, clock) }
             };
 
             return new MessengerDependencyResolver(factories);
@@ -88,11 +117,47 @@ namespace Messenger.Web.Composition
         {
             var configured = ConfigurationManager.AppSettings[PhotoStorageRootSetting];
 
-            if (string.IsNullOrWhiteSpace(configured))
-                return HostingEnvironment.MapPath("~/App_Data/Photos");
+            return string.IsNullOrWhiteSpace(configured)
+                ? HostingEnvironment.MapPath("~/App_Data/Photos")
+                : MapConfiguredPath(configured.Trim());
+        }
+
+        /// <summary>
+        /// โฟลเดอร์ที่จะเขียนไฟล์ .eml แทนการส่งจริง (D28)
+        ///
+        /// คืน null = ส่งจริงผ่าน SMTP ตาม &lt;mailSettings&gt; ใน Web.config
+        /// ซึ่งเกิดขึ้นเมื่อใส่ค่า "none" หรือลบ key ทิ้ง
+        /// </summary>
+        private static string ResolveEmailPickupDirectory()
+        {
+            var configured = ConfigurationManager.AppSettings[EmailPickupDirectorySetting];
+
+            if (configured == null)
+                return null;
 
             configured = configured.Trim();
 
+            if (string.Equals(configured, NoPickupDirectory, StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            if (configured.Length == 0)
+                return HostingEnvironment.MapPath("~/App_Data/Mail");
+
+            return MapConfiguredPath(configured);
+        }
+
+        private static string ResolveEmailTemplateFolder()
+        {
+            var configured = ConfigurationManager.AppSettings[EmailTemplateFolderSetting];
+
+            return string.IsNullOrWhiteSpace(configured)
+                ? HostingEnvironment.MapPath("~/App_Data/EmailTemplates")
+                : MapConfiguredPath(configured.Trim());
+        }
+
+        /// <summary>path เต็มใช้ตรง ๆ ส่วน path สัมพัทธ์อ้างอิงจากโฟลเดอร์ของเว็บ</summary>
+        private static string MapConfiguredPath(string configured)
+        {
             if (configured.StartsWith("~"))
                 return HostingEnvironment.MapPath(configured);
 

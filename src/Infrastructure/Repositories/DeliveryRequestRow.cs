@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Messenger.Domain.Entities;
 using Messenger.Domain.Enums;
 
@@ -44,6 +45,9 @@ namespace Messenger.Infrastructure.Repositories
         public decimal? DistanceKm { get; set; }
         public bool? ReturnToOffice { get; set; }
 
+        /// <summary>รหัสประเภทงานคั่นด้วยจุลภาค (มาจาก view เพื่อเลี่ยง query ทีละใบ)</summary>
+        public string JobTypeCodes { get; set; }
+
         public DeliveryRequest ToEntity()
         {
             return new DeliveryRequest
@@ -75,9 +79,30 @@ namespace Messenger.Infrastructure.Repositories
                 CreatedAt = CreatedAt,
                 UpdatedBy = UpdatedBy,
                 UpdatedAt = UpdatedAt,
-                JobTypes = new List<RequestJobType>(),
+                JobTypes = ToJobTypes(),
                 Assignment = ToAssignment()
             };
+        }
+
+        /// <summary>
+        /// แปลงรหัสประเภทงานที่ view รวมมาให้ เป็นรายการที่ใช้แสดงผลได้
+        /// (ไม่มี DetailText — ผู้ที่ต้องการรายละเอียดต่อประเภทต้องอ่านผ่าน
+        /// spRequestJobTypeListByReq ซึ่ง GetById เรียกให้อยู่แล้ว)
+        /// </summary>
+        private IList<RequestJobType> ToJobTypes()
+        {
+            if (string.IsNullOrWhiteSpace(JobTypeCodes))
+                return new List<RequestJobType>();
+
+            return JobTypeCodes
+                .Split(',')
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .Select(code => new RequestJobType
+                {
+                    ReqId = ReqId,
+                    JobType = Domain.Enums.JobTypes.Parse(code.Trim())
+                })
+                .ToList();
         }
 
         /// <summary>คืน null เมื่อยังไม่มีใครยืนยันรับงาน (คอลัมน์จาก LEFT JOIN เป็น NULL ทั้งชุด)</summary>

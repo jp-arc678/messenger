@@ -82,6 +82,7 @@ namespace Messenger.Web.Controllers
                 CanManagePhotos = _photos.CanManagePhotos(result.Value, CurrentUser),
                 CanConfirmReceipt = _workflow.CanConfirmReceipt(result.Value, CurrentUser),
                 Message = TempData["Message"] as string,
+                WarningMessage = TempData["Warning"] as string,
                 ErrorMessage = TempData["Error"] as string
             };
 
@@ -104,6 +105,10 @@ namespace Messenger.Web.Controllers
             if (result.Success)
             {
                 TempData["Message"] = $"{ActionName(statusAction)}ใบแจ้งงาน {result.Value.ReqNo} เรียบร้อยแล้ว";
+
+                // D26 — เช่น ปิดงานสำเร็จแต่ส่งอีเมลแจ้งผู้แจ้งไม่ออก
+                if (result.HasWarnings)
+                    TempData["Warning"] = string.Join(" · ", result.Warnings);
             }
             else
             {

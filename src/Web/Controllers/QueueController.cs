@@ -86,6 +86,7 @@ namespace Messenger.Web.Controllers
                 Closed = day.Closed.Select(ToRow).ToList(),
 
                 Message = TempData["Message"] as string,
+                WarningMessage = TempData["Warning"] as string,
                 ErrorMessage = TempData["Error"] as string
             };
         }

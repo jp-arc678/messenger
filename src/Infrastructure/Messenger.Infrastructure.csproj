@@ -12,6 +12,11 @@
 
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.35" />
+    <!--
+      ClosedXML : เขียนไฟล์ Excel (.xlsx) สำหรับ export รายงาน (Phase 5 · D30)
+      เลือกรุ่น 0.102.x เพราะยังรองรับ .NET Framework 4.8 เต็มรูปแบบ
+    -->
+    <PackageReference Include="ClosedXML" Version="0.102.3" />
   </ItemGroup>
 
   <ItemGroup>

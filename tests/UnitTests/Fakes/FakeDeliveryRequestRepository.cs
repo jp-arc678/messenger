@@ -48,6 +48,10 @@ namespace Messenger.UnitTests.Fakes
                 BranchName = "สาขา " + data.BranchCode,
                 RequesterEmpCode = data.RequesterEmpCode,
                 RequesterName = "ผู้แจ้ง " + data.RequesterEmpCode,
+
+                // ของจริงมาจาก join กับ tblEmployee ใน vwDeliveryRequest
+                // ที่นี่สร้างให้เป็นรูปแบบเดียวกันเสมอ เพื่อให้เทสต์ BR-5 มีที่อยู่ให้ส่ง
+                RequesterEmail = data.RequesterEmpCode + "@example.co.th",
                 RequestDateTime = data.RequestDateTime,
                 SendDate = data.SendDate,
                 ContactName = data.ContactName,
@@ -229,6 +233,12 @@ namespace Messenger.UnitTests.Fakes
             _requests[reqId].Status = status;
         }
 
+        /// <summary>ตั้ง/ล้างอีเมลผู้แจ้งของใบงาน (ใช้ทดสอบกรณีไม่มีอีเมลให้ส่ง — BR-5)</summary>
+        public void SetRequesterEmail(int reqId, string email)
+        {
+            _requests[reqId].RequesterEmail = email;
+        }
+
         /// <summary>จำลองว่ามีผู้ใช้อื่นแก้ใบงานนี้ไปแล้ว (rowVersion เปลี่ยน)</summary>
         public void SimulateExternalEdit(int reqId)
         {
@@ -330,6 +340,7 @@ namespace Messenger.UnitTests.Fakes
                 BranchName = source.BranchName,
                 RequesterEmpCode = source.RequesterEmpCode,
                 RequesterName = source.RequesterName,
+                RequesterEmail = source.RequesterEmail,
                 RequestDateTime = source.RequestDateTime,
                 SendDate = source.SendDate,
                 ContactName = source.ContactName,

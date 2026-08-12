@@ -45,7 +45,10 @@ namespace Messenger.UnitTests
 
             _clock = new FakeClock(MondayMorning);
             _requestService = new DeliveryRequestService(_requests, _employees, _clock);
-            _workflow = new RequestWorkflowService(_requests, _requests, _employees, _clock);
+
+            var notifications = new RequestNotificationService(
+                new FakeEmailSender(), new FakeEmailTemplateSource(), _employees, _clock);
+            _workflow = new RequestWorkflowService(_requests, _requests, _employees, notifications, _clock);
             _photos = new PhotoService(_photoRepository, _requests, _storage, _clock);
         }
 

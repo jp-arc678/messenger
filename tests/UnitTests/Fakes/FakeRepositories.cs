@@ -68,6 +68,16 @@ namespace Messenger.UnitTests.Fakes
             return this;
         }
 
+        /// <summary>ตั้ง/ล้างอีเมลของพนักงานที่มีอยู่แล้ว (ใช้ทดสอบ BR-5)</summary>
+        public FakeEmployeeRepository WithEmployeeEmail(string empCode, string email)
+        {
+            if (!_employees.ContainsKey(empCode))
+                WithEmployee(empCode, "SDC");
+
+            _employees[empCode].Email = email;
+            return this;
+        }
+
         public Employee GetByEmpCode(string empCode)
         {
             return _employees.TryGetValue(empCode ?? string.Empty, out var employee) ? employee : null;

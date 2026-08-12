@@ -42,6 +42,9 @@ namespace Messenger.Web.ViewModels
 
         public string Message { get; set; }
 
+        /// <summary>สำเร็จแล้วแต่มีเรื่องต้องบอก เช่น ส่งอีเมลไม่ออก (D26)</summary>
+        public string WarningMessage { get; set; }
+
         public string ErrorMessage { get; set; }
 
         public static string FormatDate(DateTime date)

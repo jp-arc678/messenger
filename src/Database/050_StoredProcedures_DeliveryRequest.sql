@@ -241,7 +241,7 @@ BEGIN
            Status, IsPersonal, ReceiptConfirmed, ReceiptConfirmedAt, ReceiptConfirmedBy, [RowVersion],
            CreatedBy, CreatedAt, UpdatedBy, UpdatedAt,
            MessengerEmpCode, MessengerName, ConfirmedAt, SequenceOrder,
-           Route, DistanceKm, ReturnToOffice
+           Route, DistanceKm, ReturnToOffice, JobTypeCodes
     FROM dbo.vwDeliveryRequest
     WHERE ReqId      = @ReqId
       AND BranchCode = @BranchCode;
@@ -288,7 +288,7 @@ BEGIN
            Status, IsPersonal, ReceiptConfirmed, ReceiptConfirmedAt, ReceiptConfirmedBy, [RowVersion],
            CreatedBy, CreatedAt, UpdatedBy, UpdatedAt,
            MessengerEmpCode, MessengerName, ConfirmedAt, SequenceOrder,
-           Route, DistanceKm, ReturnToOffice
+           Route, DistanceKm, ReturnToOffice, JobTypeCodes
     FROM dbo.vwDeliveryRequest
     WHERE BranchCode = @BranchCode
       AND (@RequesterEmpCode IS NULL OR RequesterEmpCode = @RequesterEmpCode)

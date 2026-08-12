@@ -90,6 +90,11 @@
     <div class="alert alert-success" role="alert">@Model.Message</div>
 }
 
+@if (!string.IsNullOrEmpty(Model.WarningMessage))
+{
+    <div class="alert alert-warning" role="alert">@Model.WarningMessage</div>
+}
+
 @if (!string.IsNullOrEmpty(Model.ErrorMessage))
 {
     <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>

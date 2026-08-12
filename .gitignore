@@ -38,6 +38,9 @@ _ReSharper*/
 *.config.local
 appsettings.local.json
 
-# รูปที่อัปโหลดตอน dev (D25 — ค่าเริ่มต้นเก็บที่ App_Data\Photos)
-# ข้อมูลจริงต้องไม่เข้า repo และ production ให้ตั้ง PhotoStorageRoot ชี้นอกโฟลเดอร์เว็บ
-src/Web/App_Data/
+# ข้อมูลที่ระบบสร้างตอน dev — ต้องไม่เข้า repo
+# (D25 รูปอัปโหลด · D28 ไฟล์ .eml ที่เขียนแทนการส่งเมลจริง)
+# production ให้ตั้ง PhotoStorageRoot / EmailPickupDirectory ชี้นอกโฟลเดอร์เว็บ
+# หมายเหตุ : App_Data/EmailTemplates ยังต้องเข้า repo เพราะเป็น template ตั้งต้น
+src/Web/App_Data/Photos/
+src/Web/App_Data/Mail/

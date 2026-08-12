@@ -25,6 +25,7 @@ namespace Messenger.UnitTests
 
         private FakeDeliveryRequestRepository _requests;
         private FakeEmployeeRepository _employees;
+        private FakeEmailSender _emails;
         private FakeClock _clock;
         private DeliveryRequestService _requestService;
         private RequestWorkflowService _workflow;
@@ -43,8 +44,18 @@ namespace Messenger.UnitTests
                 .WithEmployee("20003", "SBK", "M");
 
             _clock = new FakeClock(MondayMorning);
+            _emails = new FakeEmailSender();
             _requestService = new DeliveryRequestService(_requests, _employees, _clock);
-            _workflow = new RequestWorkflowService(_requests, _requests, _employees, _clock);
+            _workflow = NewWorkflowService(_employees);
+        }
+
+        /// <summary>ประกอบ workflow service พร้อมสายส่งเมลจริงของ Phase 4 (BR-5)</summary>
+        private RequestWorkflowService NewWorkflowService(FakeEmployeeRepository employees)
+        {
+            var notifications = new RequestNotificationService(
+                _emails, new FakeEmailTemplateSource(), employees, _clock);
+
+            return new RequestWorkflowService(_requests, _requests, employees, notifications, _clock);
         }
 
         // ---------------- ตัวช่วย ----------------
@@ -167,7 +178,7 @@ namespace Messenger.UnitTests
                 .WithEmployee("10001", "SDC", "A");
 
             var requestService = new DeliveryRequestService(_requests, employees, _clock);
-            var workflow = new RequestWorkflowService(_requests, _requests, employees, _clock);
+            var workflow = NewWorkflowService(employees);
 
             var created = requestService.Create(ValidCommand(), User("10002"));
             var result = workflow.Apply(created.Value.ReqId, RequestAction.Confirm, null, Admin());
@@ -528,6 +539,83 @@ namespace Messenger.UnitTests
             var result = _workflow.Apply(reqId, RequestAction.Cancel, "ยกเลิกย้อนหลัง", Admin());
 
             Assert.That(result.Success, Is.False);
+        }
+
+        // ==================== BR-5 : อีเมลตอนปิดงาน ====================
+
+        [Test]
+        public void ปิดงานแล้วส่งอีเมลถึงผู้แจ้งหนึ่งฉบับ()
+        {
+            var reqId = ConfirmedRequest();
+
+            var result = _workflow.Apply(reqId, RequestAction.Complete, null, Messenger());
+
+            Assert.That(result.Success, Is.True, result.FirstError);
+            Assert.That(result.HasWarnings, Is.False, result.Warnings.FirstOrDefault());
+            Assert.That(_emails.Sent.Count, Is.EqualTo(1));
+            Assert.That(_emails.LastMessage.To, Is.EqualTo(new[] { "10002@example.co.th" }));
+            Assert.That(_emails.LastMessage.HtmlBody, Does.Contain(result.Value.ReqNo));
+        }
+
+        [Test]
+        public void เปลี่ยนสถานะอื่นต้องไม่ส่งอีเมล()
+        {
+            // BR-5 ผูกกับ "จบ process" เท่านั้น
+            var reqId = ConfirmedRequest();
+
+            _workflow.Apply(reqId, RequestAction.Pause, "ฝนตกหนัก", Messenger());
+            _workflow.Apply(reqId, RequestAction.Resume, null, Messenger());
+            _workflow.Apply(reqId, RequestAction.Cancel, "ผู้แจ้งขอยกเลิก", Messenger());
+
+            Assert.That(_emails.Sent, Is.Empty);
+        }
+
+        [Test]
+        public void ส่งอีเมลไม่ออกก็ยังปิดงานสำเร็จแต่ได้คำเตือน()
+        {
+            // D26 — งานปิดไปแล้ว ห้ามย้อนกลับเพราะเมลไม่ออก
+            var reqId = ConfirmedRequest();
+            _emails.FailWithMessage = "เชื่อมต่อ SMTP ไม่ได้";
+
+            var result = _workflow.Apply(reqId, RequestAction.Complete, null, Messenger());
+
+            Assert.That(result.Success, Is.True, result.FirstError);
+            Assert.That(result.Value.Status, Is.EqualTo(RequestStatus.Completed));
+            Assert.That(_requests.Peek(reqId).Status, Is.EqualTo(RequestStatus.Completed));
+            Assert.That(result.HasWarnings, Is.True);
+            Assert.That(result.Warnings.First(), Does.Contain("เชื่อมต่อ SMTP ไม่ได้"));
+        }
+
+        [Test]
+        public void ผู้แจ้งไม่มีอีเมลก็ยังปิดงานได้แต่ได้คำเตือน()
+        {
+            var reqId = ConfirmedRequest();
+            _requests.SetRequesterEmail(reqId, null);
+
+            var result = _workflow.Apply(reqId, RequestAction.Complete, null, Messenger());
+
+            Assert.That(result.Success, Is.True, result.FirstError);
+            Assert.That(result.HasWarnings, Is.True);
+            Assert.That(result.Warnings.First(), Does.Contain("ไม่มีอีเมล"));
+            Assert.That(_emails.Sent, Is.Empty);
+        }
+
+        [Test]
+        public void ปิดงานใบที่แจ้งแทนคนอื่นต้อง_CC_คนกรอก()
+        {
+            // D27 — createdBy = 10003 (Messenger ที่กดสร้างแทน), ผู้แจ้ง = 10002
+            _employees.WithEmployeeEmail("10003", "prasert@example.co.th");
+
+            var command = ValidCommand();
+            command.RequesterEmpCode = "10002";
+            var created = _requestService.Create(command, Messenger());
+            Assert.That(created.Success, Is.True, created.FirstError);
+
+            _workflow.Apply(created.Value.ReqId, RequestAction.Confirm, null, Messenger());
+            _workflow.Apply(created.Value.ReqId, RequestAction.Complete, null, Messenger());
+
+            Assert.That(_emails.LastMessage.To, Is.EqualTo(new[] { "10002@example.co.th" }));
+            Assert.That(_emails.LastMessage.Cc, Is.EqualTo(new[] { "prasert@example.co.th" }));
         }
 
         // ==================== audit trail ====================

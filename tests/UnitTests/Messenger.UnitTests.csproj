@@ -20,6 +20,12 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Domain\Messenger.Domain.csproj" />
     <ProjectReference Include="..\..\src\Application\Messenger.Application.csproj" />
+    <!--
+      อ้างถึง Infrastructure เพื่อทดสอบตัวสร้างไฟล์ Excel (Phase 5)
+      ซึ่งเป็นฟังก์ชันล้วน ไม่แตะ DB — เทสต์เปิดไฟล์ที่สร้างกลับมาอ่านได้จริง
+      ส่วน repository ที่ต้องต่อ DB ยังคงใช้ fake ในเทสต์เหมือนเดิม
+    -->
+    <ProjectReference Include="..\..\src\Infrastructure\Messenger.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
