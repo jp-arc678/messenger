@@ -52,6 +52,18 @@ namespace Messenger.Application.Abstractions
         public string Note { get; set; }
     }
 
+    /// <summary>ข้อมูลการกดยืนยันว่ารับของกลับมาแล้ว (BR-4)</summary>
+    public class ReceiptConfirmData
+    {
+        public int ReqId { get; set; }
+
+        public string BranchCode { get; set; }
+
+        public string ByEmpCode { get; set; }
+
+        public DateTime ConfirmedAt { get; set; }
+    }
+
     /// <summary>
     /// การเปลี่ยนสถานะ / คิวงานของ Messenger
     ///
@@ -81,6 +93,12 @@ namespace Messenger.Application.Abstractions
         /// คืน false ถ้าใบใดใบหนึ่งไม่มี assignment แล้ว
         /// </summary>
         bool SwapSequence(int reqIdA, int reqIdB, string branchCode);
+
+        /// <summary>
+        /// ตั้งค่า ReceiptConfirmed = 1 พร้อมบันทึกว่าใครกดเมื่อไหร่ (BR-4)
+        /// คืน false เมื่อใบงานถูกยืนยันไปแล้ว หรืออยู่คนละสาขา
+        /// </summary>
+        bool ConfirmReceipt(ReceiptConfirmData data);
 
         /// <summary>audit trail ของใบงาน เรียงจากเก่าไปใหม่ — ว่างเปล่าถ้าใบงานอยู่คนละสาขา</summary>
         IReadOnlyList<StatusHistoryEntry> ListHistory(int reqId, string branchCode);

@@ -191,6 +191,24 @@ namespace Messenger.UnitTests.Fakes
             return true;
         }
 
+        public bool ConfirmReceipt(ReceiptConfirmData data)
+        {
+            var request = Find(data.ReqId, data.BranchCode);
+            if (request == null)
+                return false;
+
+            // BR-4 — กดซ้ำไม่ได้ คนแรกที่กดคือคนที่ถูกบันทึกไว้
+            if (request.ReceiptConfirmed)
+                return false;
+
+            request.ReceiptConfirmed = true;
+            request.ReceiptConfirmedAt = data.ConfirmedAt;
+            request.ReceiptConfirmedBy = data.ByEmpCode;
+            request.RowVersion = NextRowVersion();
+
+            return true;
+        }
+
         public IReadOnlyList<StatusHistoryEntry> ListHistory(int reqId, string branchCode)
         {
             if (Find(reqId, branchCode) == null)
@@ -321,6 +339,8 @@ namespace Messenger.UnitTests.Fakes
                 Status = source.Status,
                 IsPersonal = source.IsPersonal,
                 ReceiptConfirmed = source.ReceiptConfirmed,
+                ReceiptConfirmedAt = source.ReceiptConfirmedAt,
+                ReceiptConfirmedBy = source.ReceiptConfirmedBy,
                 RowVersion = source.RowVersion == null ? null : (byte[])source.RowVersion.Clone(),
                 CreatedBy = source.CreatedBy,
                 CreatedAt = source.CreatedAt,

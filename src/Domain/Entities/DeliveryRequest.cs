@@ -69,6 +69,10 @@ namespace Messenger.Domain.Entities
         /// <summary>ยืนยันแล้วว่ารับของกลับมาให้ผู้แจ้งแล้ว (BR-4)</summary>
         public bool ReceiptConfirmed { get; set; }
 
+        public DateTime? ReceiptConfirmedAt { get; set; }
+
+        public string ReceiptConfirmedBy { get; set; }
+
         /// <summary>ค่าที่ใช้ทำ optimistic locking ตาม BR-2</summary>
         public byte[] RowVersion { get; set; }
 
@@ -96,9 +100,14 @@ namespace Messenger.Domain.Entities
 
         /// <summary>
         /// ใบงานนี้มีประเภท "รับเอกสาร" หรือไม่
-        /// ใช้ตัดสินเงื่อนไขปิดงานตาม BR-4 (บังคับใช้จริงใน Phase 3)
+        /// ถ้ามี ต้องกดยืนยันว่ารับของแล้วก่อนจึงปิดงานได้ (BR-4)
         /// </summary>
         public bool RequiresReceiptConfirmation =>
             JobTypes != null && JobTypes.Any(j => j.JobType == Enums.JobType.ReceiveDoc);
+
+        /// <summary>
+        /// ยังปิดงานไม่ได้เพราะติดเงื่อนไข BR-4 (มี "รับเอกสาร" แต่ยังไม่ได้กดยืนยันรับของ)
+        /// </summary>
+        public bool BlockedByReceiptConfirmation => RequiresReceiptConfirmation && !ReceiptConfirmed;
     }
 }

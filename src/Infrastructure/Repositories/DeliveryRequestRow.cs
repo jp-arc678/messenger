@@ -27,6 +27,8 @@ namespace Messenger.Infrastructure.Repositories
         public string Status { get; set; }
         public bool IsPersonal { get; set; }
         public bool ReceiptConfirmed { get; set; }
+        public DateTime? ReceiptConfirmedAt { get; set; }
+        public string ReceiptConfirmedBy { get; set; }
         public byte[] RowVersion { get; set; }
         public string CreatedBy { get; set; }
         public DateTime CreatedAt { get; set; }
@@ -66,6 +68,8 @@ namespace Messenger.Infrastructure.Repositories
                 Status = RequestStatuses.Parse(Status),
                 IsPersonal = IsPersonal,
                 ReceiptConfirmed = ReceiptConfirmed,
+                ReceiptConfirmedAt = ReceiptConfirmedAt,
+                ReceiptConfirmedBy = ReceiptConfirmedBy,
                 RowVersion = RowVersion,
                 CreatedBy = CreatedBy,
                 CreatedAt = CreatedAt,
@@ -92,6 +96,36 @@ namespace Messenger.Infrastructure.Repositories
                 Route = Route,
                 DistanceKm = DistanceKm,
                 ReturnToOffice = ReturnToOffice
+            };
+        }
+    }
+
+    /// <summary>รูปร่างของแถวจาก dbo.spDeliveryPhotoListByReq / spDeliveryPhotoGetById</summary>
+    internal class DeliveryPhotoRow
+    {
+        public int PhotoId { get; set; }
+        public int ReqId { get; set; }
+        public string PhotoType { get; set; }
+        public string FilePath { get; set; }
+        public string FileName { get; set; }
+        public int? FileSizeBytes { get; set; }
+        public DateTime CapturedAt { get; set; }
+        public string CapturedBy { get; set; }
+        public string CapturedByName { get; set; }
+
+        public DeliveryPhoto ToEntity()
+        {
+            return new DeliveryPhoto
+            {
+                PhotoId = PhotoId,
+                ReqId = ReqId,
+                PhotoType = PhotoTypes.Parse(PhotoType),
+                FilePath = FilePath,
+                FileName = FileName,
+                FileSizeBytes = FileSizeBytes,
+                CapturedAt = CapturedAt,
+                CapturedBy = CapturedBy,
+                CapturedByName = CapturedByName
             };
         }
     }

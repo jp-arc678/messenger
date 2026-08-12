@@ -20,9 +20,8 @@ namespace Messenger.Application.Services
     /// - D11  ลำดับวิ่งงานเป็นของ "วัน + สาขา" และ Messenger ประจำสาขามีคนเดียว
     /// - D22  Admin กดยืนยันแทนได้ แต่ผู้รับงานที่บันทึกคือ Messenger ประจำสาขา
     /// - BR-6 อ่าน/เขียนด้วย branchCode ของผู้ใช้เสมอ ใบงานต่างสาขาจะหาไม่เจอตั้งแต่ต้น
-    ///
-    /// หมายเหตุ BR-4 (D20) : เงื่อนไข "ต้องยืนยันรับของก่อนปิดงาน" ของใบที่มี ReceiveDoc
-    /// ยังไม่ถูกบังคับในเฟสนี้ ตาม §9 ที่จัด BR-4 ไว้ใน Phase 3 พร้อมเรื่องรูปภาพ
+    /// - BR-4 ใบที่มีประเภทงาน "รับเอกสาร" ต้องกดยืนยันรับของก่อนจึงปิดงานได้
+    ///        (ไม่บังคับว่าต้องมีรูป ตาม D9)
     /// </summary>
     public class RequestWorkflowService : IRequestWorkflowService
     {
@@ -76,9 +75,77 @@ namespace Messenger.Application.Services
             if (reason != null && reason.Length > MaxReasonLength)
                 return ServiceResult<DeliveryRequest>.Fail($"เหตุผลยาวเกิน {MaxReasonLength} ตัวอักษร");
 
+            // BR-4 — ใบที่มีประเภทงาน "รับเอกสาร" ต้องกดยืนยันรับของก่อนจึงปิดงานได้
+            // (ไม่บังคับว่าต้องมีรูป ตาม D9)
+            if (action == RequestAction.Complete && request.BlockedByReceiptConfirmation)
+            {
+                return ServiceResult<DeliveryRequest>.Fail(
+                    "ใบแจ้งงานนี้มีประเภทงาน \"รับเอกสาร\" ต้องกดยืนยันว่ารับของแล้วก่อนจึงปิดงานได้");
+            }
+
             return action == RequestAction.Confirm
                 ? ConfirmAssignment(request, transition, user)
                 : ChangeStatus(request, transition, reason, user);
+        }
+
+        public ServiceResult<DeliveryRequest> ConfirmReceipt(int reqId, UserContext user)
+        {
+            if (user == null)
+                throw new ArgumentNullException(nameof(user));
+
+            var request = _requests.GetById(reqId, user.BranchCode);
+            if (request == null)
+                return ServiceResult<DeliveryRequest>.Fail("ไม่พบใบแจ้งงานนี้ในสาขาของคุณ");
+
+            // §5 — เป็นการกระทำระหว่างวิ่งงาน จึงเป็นสิทธิ์ของ Messenger/Admin เท่านั้น
+            if (!RequestAccess.SeesWholeBranch(user))
+                return ServiceResult<DeliveryRequest>.Fail("การยืนยันรับของเป็นสิทธิ์ของเจ้าหน้าที่ Messenger และผู้ดูแลระบบเท่านั้น");
+
+            if (!request.RequiresReceiptConfirmation)
+            {
+                return ServiceResult<DeliveryRequest>.Fail(
+                    "ใบแจ้งงานนี้ไม่มีประเภทงาน \"รับเอกสาร\" จึงไม่ต้องยืนยันรับของ");
+            }
+
+            // D23 — ยืนยันได้เฉพาะช่วงที่งานกำลังเดินอยู่ เหมือนกับการอัปโหลดรูป
+            if (!IsRunning(request))
+            {
+                return ServiceResult<DeliveryRequest>.Fail(
+                    $"ยืนยันรับของได้เฉพาะตอนใบงานอยู่ในสถานะ \"กำลังส่ง\" หรือ \"พักการส่ง\" " +
+                    $"(ตอนนี้อยู่สถานะ \"{request.StatusDisplayName}\")");
+            }
+
+            if (request.ReceiptConfirmed)
+                return ServiceResult<DeliveryRequest>.Ok(request);
+
+            var confirmed = _workflow.ConfirmReceipt(new ReceiptConfirmData
+            {
+                ReqId = reqId,
+                BranchCode = user.BranchCode,
+                ByEmpCode = user.EmpCode,
+                ConfirmedAt = _clock.Now
+            });
+
+            if (!confirmed)
+            {
+                return ServiceResult<DeliveryRequest>.Conflict(
+                    "ใบแจ้งงานนี้ถูกยืนยันรับของโดยผู้ใช้อื่นไปแล้ว กรุณาโหลดหน้าใหม่");
+            }
+
+            return Reload(reqId, user);
+        }
+
+        public bool CanConfirmReceipt(DeliveryRequest request, UserContext user)
+        {
+            if (request == null || user == null)
+                return false;
+
+            if (!RequestAccess.SameBranch(request.BranchCode, user.BranchCode))
+                return false;
+
+            return RequestAccess.SeesWholeBranch(user)
+                && request.BlockedByReceiptConfirmation
+                && IsRunning(request);
         }
 
         public ServiceResult<QueueDay> GetQueue(UserContext user, DateTime sendDate)

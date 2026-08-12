@@ -59,6 +59,24 @@ SELECT 'Cancel', ReqId, ByEmpCode, Reason FROM MessengerDb.dbo.tblCancelReason
 ORDER BY ReqId;
 '@
 
+Invoke-Sql 'รูปยืนยัน (BR-3) — DB เก็บแค่ path ไฟล์จริงอยู่บนดิสก์' @'
+SELECT p.PhotoId, r.ReqNo, p.PhotoType, p.FileSizeBytes, p.FilePath,
+       CONVERT(varchar(16), p.CapturedAt, 120) AS CapturedAt, p.CapturedBy
+FROM MessengerDb.dbo.tblDeliveryPhoto AS p
+INNER JOIN MessengerDb.dbo.tblDeliveryRequest AS r ON r.ReqId = p.ReqId
+ORDER BY p.PhotoId;
+'@
+
+Invoke-Sql 'ใบที่ต้องยืนยันรับของ (BR-4) และสถานะการยืนยัน' @'
+SELECT r.ReqId, r.ReqNo, r.Status, r.ReceiptConfirmed,
+       CONVERT(varchar(16), r.ReceiptConfirmedAt, 120) AS ReceiptConfirmedAt,
+       r.ReceiptConfirmedBy
+FROM MessengerDb.dbo.tblDeliveryRequest AS r
+WHERE EXISTS (SELECT 1 FROM MessengerDb.dbo.tblRequestJobType AS j
+              WHERE j.ReqId = r.ReqId AND j.JobType = 'ReceiveDoc')
+ORDER BY r.ReqId;
+'@
+
 Invoke-Sql 'ผลลัพธ์จริงของ spDeliveryRequestList : สาขา SDC ทั้งสาขา' @'
 EXEC MessengerDb.dbo.spDeliveryRequestList @BranchCode = 'SDC';
 '@

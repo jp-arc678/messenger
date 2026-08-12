@@ -22,6 +22,12 @@ namespace Messenger.Web.ViewModels
         /// <summary>true = ปุ่มขนาดเล็ก (ใช้ในรายการคิว)</summary>
         public bool Compact { get; set; }
 
+        /// <summary>
+        /// โชว์ปุ่ม "ยืนยันรับของแล้ว" (BR-4) — ไม่ใช่ transition ใน §6
+        /// แต่วางไว้ที่เดียวกันเพราะเป็นปุ่มที่ Messenger กดในจังหวะเดียวกัน
+        /// </summary>
+        public bool CanConfirmReceipt { get; set; }
+
         public string ButtonSizeClass => Compact ? " btn-sm" : string.Empty;
 
         /// <summary>สีปุ่มตามความหมายของการกระทำ</summary>

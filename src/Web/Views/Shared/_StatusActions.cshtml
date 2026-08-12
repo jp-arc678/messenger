@@ -6,6 +6,24 @@
     เพราะ partial นี้ถูกวางซ้ำหลายใบในหน้าคิวงาน การกางในที่เดิมอ่านง่ายกว่า
     และไม่มีปัญหาเรื่องการซ้อนชั้นเมื่ออยู่ในตาราง/การ์ด
 *@
+@if (Model.CanConfirmReceipt)
+{
+    @* BR-4 — ใบที่มี "รับเอกสาร" ต้องกดปุ่มนี้ก่อนจึงจะปิดงานได้ *@
+    <div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2 py-2">
+        <span class="small mb-0">
+            ใบงานนี้มีประเภทงาน <strong>รับเอกสาร</strong> — ต้องยืนยันว่ารับของแล้วก่อนจึงปิดงานได้
+        </span>
+        @using (Html.BeginForm("ConfirmReceipt", "Requests", FormMethod.Post))
+        {
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@Model.ReqId" />
+            <input type="hidden" name="returnTo" value="@Model.ReturnTo" />
+            <input type="hidden" name="queueDate" value="@Model.QueueDate" />
+            <button type="submit" class="btn btn-warning@Model.ButtonSizeClass">ยืนยันรับของแล้ว</button>
+        }
+    </div>
+}
+
 @if (Model.Actions != null && Model.Actions.Count > 0)
 {
     <div class="d-flex flex-wrap gap-2">

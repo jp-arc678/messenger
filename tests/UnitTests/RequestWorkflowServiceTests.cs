@@ -96,6 +96,21 @@ namespace Messenger.UnitTests
             return result.Value.ReqId;
         }
 
+        /// <summary>ใบงานที่มีประเภท "รับเอกสาร" และยืนยันรับงานแล้ว — ใบที่ติดเงื่อนไข BR-4</summary>
+        private int ReceiveDocRequest()
+        {
+            var created = _requestService.Create(
+                ValidCommand(null, JobType.SendDoc, JobType.ReceiveDoc), User("10002"));
+
+            Assert.That(created.Success, Is.True, created.FirstError);
+            Assert.That(created.Value.RequiresReceiptConfirmation, Is.True);
+
+            var confirmed = _workflow.Apply(created.Value.ReqId, RequestAction.Confirm, null, Messenger());
+            Assert.That(confirmed.Success, Is.True, confirmed.FirstError);
+
+            return created.Value.ReqId;
+        }
+
         /// <summary>สร้างใบงานที่ยืนยันรับงานแล้ว (สถานะ Delivering)</summary>
         private int ConfirmedRequest(string branchCode = "SDC", DateTime? sendDate = null)
         {
@@ -317,20 +332,118 @@ namespace Messenger.UnitTests
             Assert.That(result.Success, Is.False, "§6 ไม่มีเส้นทาง Paused → Completed");
         }
 
+        // ==================== BR-4 : เงื่อนไขปิดงานของใบที่มี "รับเอกสาร" ====================
+
         [Test]
-        public void ใบงานที่มีรับเอกสารยังปิดได้ในเฟสนี้()
+        public void ใบที่มีรับเอกสารปิดงานไม่ได้ถ้ายังไม่ยืนยันรับของ()
         {
-            // D20 — BR-4 (ต้องกดยืนยันรับของก่อนปิดงาน) ถูกจัดไว้ที่ Phase 3 ตาม §9
-            // เทสต์นี้ตรึงพฤติกรรมปัจจุบันไว้ให้ชัด เมื่อทำ Phase 3 ต้องกลับมาแก้เทสต์นี้
+            var reqId = ReceiveDocRequest();
+
+            var result = _workflow.Apply(reqId, RequestAction.Complete, null, Messenger());
+
+            Assert.That(result.Success, Is.False);
+            Assert.That(result.FirstError, Does.Contain("ยืนยันว่ารับของแล้ว"));
+            Assert.That(_requests.Peek(reqId).Status, Is.EqualTo(RequestStatus.Delivering));
+        }
+
+        [Test]
+        public void ยืนยันรับของแล้วจึงปิดงานได้()
+        {
+            var reqId = ReceiveDocRequest();
+
+            var confirmed = _workflow.ConfirmReceipt(reqId, Messenger());
+            var completed = _workflow.Apply(reqId, RequestAction.Complete, null, Messenger());
+
+            Assert.That(confirmed.Success, Is.True, confirmed.FirstError);
+            Assert.That(confirmed.Value.ReceiptConfirmed, Is.True);
+            Assert.That(confirmed.Value.ReceiptConfirmedBy, Is.EqualTo("10003"));
+            Assert.That(completed.Success, Is.True, completed.FirstError);
+            Assert.That(completed.Value.Status, Is.EqualTo(RequestStatus.Completed));
+        }
+
+        [Test]
+        public void ใบที่ไม่มีรับเอกสารปิดงานได้เลยและไม่ต้องยืนยันรับของ()
+        {
+            var reqId = ConfirmedRequest();
+
+            var confirmReceipt = _workflow.ConfirmReceipt(reqId, Messenger());
+            var completed = _workflow.Apply(reqId, RequestAction.Complete, null, Messenger());
+
+            Assert.That(confirmReceipt.Success, Is.False, "ใบที่ไม่มี ReceiveDoc ไม่ควรให้กดยืนยันรับของ");
+            Assert.That(completed.Success, Is.True, completed.FirstError);
+        }
+
+        [Test]
+        public void ยกเลิกใบที่มีรับเอกสารได้โดยไม่ต้องยืนยันรับของ()
+        {
+            // BR-4 เป็นเงื่อนไขของการ "ปิดงาน" เท่านั้น ไม่เกี่ยวกับการยกเลิก
+            var reqId = ReceiveDocRequest();
+
+            var result = _workflow.Apply(reqId, RequestAction.Cancel, "ผู้รับปิดกิจการ", Messenger());
+
+            Assert.That(result.Success, Is.True, result.FirstError);
+        }
+
+        [Test]
+        public void User_ยืนยันรับของไม่ได้()
+        {
+            var reqId = ReceiveDocRequest();
+
+            var result = _workflow.ConfirmReceipt(reqId, User("10002"));
+
+            Assert.That(result.Success, Is.False);
+            Assert.That(_requests.Peek(reqId).ReceiptConfirmed, Is.False);
+        }
+
+        [Test]
+        public void ยืนยันรับของข้ามสาขาไม่ได้()
+        {
+            var reqId = ReceiveDocRequest();
+
+            var result = _workflow.ConfirmReceipt(reqId, Messenger("SBK"));
+
+            Assert.That(result.Success, Is.False);
+            Assert.That(result.FirstError, Does.Contain("ไม่พบใบแจ้งงาน"));
+        }
+
+        [Test]
+        public void ยืนยันรับของตอนยังไม่รับงานไม่ได้()
+        {
+            // D23 — ยืนยันได้เฉพาะช่วงที่งานกำลังเดินอยู่ เหมือนกฎของรูป
             var created = _requestService.Create(
                 ValidCommand(null, JobType.SendDoc, JobType.ReceiveDoc), User("10002"));
 
-            _workflow.Apply(created.Value.ReqId, RequestAction.Confirm, null, Messenger());
-            var result = _workflow.Apply(created.Value.ReqId, RequestAction.Complete, null, Messenger());
+            var result = _workflow.ConfirmReceipt(created.Value.ReqId, Messenger());
 
-            Assert.That(created.Value.RequiresReceiptConfirmation, Is.True);
-            Assert.That(result.Success, Is.True, result.FirstError);
-            Assert.That(result.Value.ReceiptConfirmed, Is.False);
+            Assert.That(result.Success, Is.False);
+            Assert.That(result.FirstError, Does.Contain("กำลังส่ง"));
+        }
+
+        [Test]
+        public void กดยืนยันรับของซ้ำไม่ทับข้อมูลคนแรก()
+        {
+            var reqId = ReceiveDocRequest();
+
+            _workflow.ConfirmReceipt(reqId, Messenger());
+            var again = _workflow.ConfirmReceipt(reqId, Admin());
+
+            Assert.That(again.Success, Is.True, "กดซ้ำถือว่าไม่มีอะไรต้องทำ ไม่ใช่ข้อผิดพลาด");
+            Assert.That(_requests.Peek(reqId).ReceiptConfirmedBy, Is.EqualTo("10003"));
+        }
+
+        [Test]
+        public void ปุ่มยืนยันรับของโผล่เฉพาะใบที่ติดเงื่อนไข_BR4()
+        {
+            var withReceiveDoc = _requests.Peek(ReceiveDocRequest());
+            var withoutReceiveDoc = _requests.Peek(ConfirmedRequest());
+
+            Assert.That(_workflow.CanConfirmReceipt(withReceiveDoc, Messenger()), Is.True);
+            Assert.That(_workflow.CanConfirmReceipt(withReceiveDoc, User("10002")), Is.False);
+            Assert.That(_workflow.CanConfirmReceipt(withoutReceiveDoc, Messenger()), Is.False);
+
+            _workflow.ConfirmReceipt(withReceiveDoc.ReqId, Messenger());
+            Assert.That(_workflow.CanConfirmReceipt(_requests.Peek(withReceiveDoc.ReqId), Messenger()), Is.False,
+                "ยืนยันไปแล้วก็ไม่ต้องโชว์ปุ่มอีก");
         }
 
         [Test]

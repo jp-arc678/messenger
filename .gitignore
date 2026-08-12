@@ -37,3 +37,7 @@ _ReSharper*/
 # ค่า config เฉพาะเครื่อง (connection string ฯลฯ)
 *.config.local
 appsettings.local.json
+
+# รูปที่อัปโหลดตอน dev (D25 — ค่าเริ่มต้นเก็บที่ App_Data\Photos)
+# ข้อมูลจริงต้องไม่เข้า repo และ production ให้ตั้ง PhotoStorageRoot ชี้นอกโฟลเดอร์เว็บ
+src/Web/App_Data/

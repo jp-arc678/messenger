@@ -73,6 +73,8 @@ SELECT
     r.Status,
     r.IsPersonal,
     r.ReceiptConfirmed,
+    r.ReceiptConfirmedAt,
+    r.ReceiptConfirmedBy,
     r.[RowVersion],
     r.CreatedBy,
     r.CreatedAt,

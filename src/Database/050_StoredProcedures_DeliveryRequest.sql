@@ -238,7 +238,7 @@ BEGIN
            RequesterEmpCode, RequesterName, RequesterDeptCode, RequesterUnitName,
            RequesterPhoneExt, RequesterEmail,
            RequestDateTime, SendDate, ContactName, Address, Phone, Detail,
-           Status, IsPersonal, ReceiptConfirmed, [RowVersion],
+           Status, IsPersonal, ReceiptConfirmed, ReceiptConfirmedAt, ReceiptConfirmedBy, [RowVersion],
            CreatedBy, CreatedAt, UpdatedBy, UpdatedAt,
            MessengerEmpCode, MessengerName, ConfirmedAt, SequenceOrder,
            Route, DistanceKm, ReturnToOffice
@@ -285,7 +285,7 @@ BEGIN
            RequesterEmpCode, RequesterName, RequesterDeptCode, RequesterUnitName,
            RequesterPhoneExt, RequesterEmail,
            RequestDateTime, SendDate, ContactName, Address, Phone, Detail,
-           Status, IsPersonal, ReceiptConfirmed, [RowVersion],
+           Status, IsPersonal, ReceiptConfirmed, ReceiptConfirmedAt, ReceiptConfirmedBy, [RowVersion],
            CreatedBy, CreatedAt, UpdatedBy, UpdatedAt,
            MessengerEmpCode, MessengerName, ConfirmedAt, SequenceOrder,
            Route, DistanceKm, ReturnToOffice

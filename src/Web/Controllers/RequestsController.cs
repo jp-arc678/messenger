@@ -20,11 +20,15 @@ namespace Messenger.Web.Controllers
     {
         private readonly IDeliveryRequestService _service;
         private readonly IRequestWorkflowService _workflow;
+        private readonly IPhotoService _photos;
 
-        public RequestsController(IDeliveryRequestService service, IRequestWorkflowService workflow)
+        public RequestsController(IDeliveryRequestService service,
+                                  IRequestWorkflowService workflow,
+                                  IPhotoService photos)
         {
             _service = service ?? throw new ArgumentNullException(nameof(service));
             _workflow = workflow ?? throw new ArgumentNullException(nameof(workflow));
+            _photos = photos ?? throw new ArgumentNullException(nameof(photos));
         }
 
         [HttpGet]
@@ -66,6 +70,7 @@ namespace Messenger.Web.Controllers
                 return HttpNotFoundWithMessage(result.FirstError);
 
             var history = _workflow.GetHistory(id, CurrentUser);
+            var photos = _photos.List(id, CurrentUser);
 
             var model = new RequestDetailsViewModel
             {
@@ -73,6 +78,9 @@ namespace Messenger.Web.Controllers
                 CanEdit = _service.CanEdit(result.Value, CurrentUser),
                 Actions = _workflow.AvailableActions(result.Value, CurrentUser),
                 History = history.Success ? history.Value : new List<StatusHistoryEntry>(),
+                Photos = photos.Success ? photos.Value : new List<DeliveryPhoto>(),
+                CanManagePhotos = _photos.CanManagePhotos(result.Value, CurrentUser),
+                CanConfirmReceipt = _workflow.CanConfirmReceipt(result.Value, CurrentUser),
                 Message = TempData["Message"] as string,
                 ErrorMessage = TempData["Error"] as string
             };
@@ -101,6 +109,26 @@ namespace Messenger.Web.Controllers
             {
                 TempData["Error"] = string.Join(" · ", result.Errors);
             }
+
+            if (string.Equals(returnTo, "queue", StringComparison.OrdinalIgnoreCase))
+                return RedirectToAction("Index", "Queue", new { date = queueDate });
+
+            return RedirectToAction("Details", new { id });
+        }
+
+        /// <summary>
+        /// กดยืนยันว่ารับของกลับมาแล้ว (BR-4) — เงื่อนไขก่อนปิดงานของใบที่มี "รับเอกสาร"
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public ActionResult ConfirmReceipt(int id, string returnTo, string queueDate)
+        {
+            var result = _workflow.ConfirmReceipt(id, CurrentUser);
+
+            if (result.Success)
+                TempData["Message"] = $"ยืนยันรับของของใบแจ้งงาน {result.Value.ReqNo} เรียบร้อยแล้ว";
+            else
+                TempData["Error"] = string.Join(" · ", result.Errors);
 
             if (string.Equals(returnTo, "queue", StringComparison.OrdinalIgnoreCase))
                 return RedirectToAction("Index", "Queue", new { date = queueDate });

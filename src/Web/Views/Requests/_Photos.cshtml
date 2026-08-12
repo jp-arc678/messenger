@@ -1,0 +1,99 @@
+@model RequestDetailsViewModel
+@*
+    รูปยืนยันของใบแจ้งงาน (BR-3)
+
+    ไฟล์รูปอยู่นอก web root จึงต้องเรียกผ่าน Photos/Show ที่ตรวจสิทธิ์ก่อนเสมอ
+    ฟอร์มอัปโหลดโผล่เฉพาะคนที่มีสิทธิ์จัดการรูป ณ สถานะนั้น (D23) — ซึ่ง service
+    เป็นคนตัดสิน ไม่ใช่ view
+*@
+<div class="card shadow-sm mb-3" id="photos">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">รูปยืนยัน</span>
+        <span class="badge text-bg-secondary">@Model.Photos.Count</span>
+    </div>
+    <div class="card-body">
+
+        @if (Model.CanManagePhotos)
+        {
+            using (Html.BeginForm("Upload", "Photos", FormMethod.Post,
+                       new { enctype = "multipart/form-data", id = "photoUploadForm", data_max_bytes = "2097152" }))
+            {
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="reqId" value="@Model.Request.ReqId" />
+
+                <div class="row g-2 align-items-end mb-3">
+                    <div class="col-12 col-sm-4 col-lg-3">
+                        <label class="form-label" for="photoType">ประเภทรูป</label>
+                        <select class="form-select" id="photoType" name="photoType">
+                            @foreach (var type in PhotoTypes.All)
+                            {
+                                <option value="@PhotoTypes.ToCode(type)">@PhotoTypes.ToDisplayName(type)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12 col-sm-8 col-lg-6">
+                        <label class="form-label" for="photoFile">ไฟล์รูป (ถ่ายจากกล้องได้)</label>
+                        @* capture="environment" ทำให้มือถือเปิดกล้องหลังให้เลย *@
+                        <input type="file" class="form-control" id="photoFile" name="file"
+                               accept="image/jpeg,image/png" capture="environment" />
+                    </div>
+                    <div class="col-12 col-lg-3">
+                        <button type="submit" class="btn btn-primary w-100" id="photoUploadButton">อัปโหลดรูป</button>
+                    </div>
+                </div>
+
+                <div class="small text-body-secondary" id="photoUploadHint">
+                    ระบบจะย่อรูปให้ไม่เกิน 2 MB ก่อนส่งอัตโนมัติ · รองรับ JPG และ PNG
+                </div>
+            }
+        }
+        else if (Model.Photos.Count == 0)
+        {
+            <div class="text-body-secondary">ยังไม่มีรูปยืนยัน</div>
+        }
+
+        @if (Model.Photos.Count > 0)
+        {
+            <div class="row g-3 mt-1">
+                @foreach (var photo in Model.Photos)
+                {
+                    <div class="col-6 col-md-4 col-lg-3">
+                        <div class="card h-100">
+                            <a href="@Url.Action("Show", "Photos", new { id = photo.PhotoId })" target="_blank"
+                               title="เปิดรูปขนาดเต็ม">
+                                <img src="@Url.Action("Show", "Photos", new { id = photo.PhotoId })"
+                                     class="card-img-top" alt="@photo.PhotoTypeDisplayName"
+                                     style="aspect-ratio: 4 / 3; object-fit: cover;" />
+                            </a>
+                            <div class="card-body p-2">
+                                <div>
+                                    <span class="badge @(photo.PhotoType == PhotoType.Send ? "text-bg-primary" : "text-bg-success")">
+                                        @photo.PhotoTypeDisplayName
+                                    </span>
+                                </div>
+                                <div class="small text-body-secondary mt-1">
+                                    @photo.CapturedAt.ToString("dd/MM/yyyy HH:mm")<br />
+                                    โดย @(string.IsNullOrWhiteSpace(photo.CapturedByName) ? photo.CapturedBy : photo.CapturedByName)
+                                </div>
+                            </div>
+                            @if (Model.CanManagePhotos)
+                            {
+                                <div class="card-footer p-2 bg-white border-top-0">
+                                    @using (Html.BeginForm("Delete", "Photos", FormMethod.Post))
+                                    {
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@photo.PhotoId" />
+                                        <input type="hidden" name="reqId" value="@Model.Request.ReqId" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger w-100"
+                                                onclick="return confirm('ลบรูปนี้ใช่หรือไม่');">ลบรูป</button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+    </div>
+</div>

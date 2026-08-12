@@ -108,6 +108,29 @@ namespace Messenger.Infrastructure.Repositories
             }
         }
 
+        public bool ConfirmReceipt(ReceiptConfirmData data)
+        {
+            if (data == null)
+                throw new ArgumentNullException(nameof(data));
+
+            RequireBranch(data.BranchCode);
+
+            using (var connection = _connectionFactory.CreateConnection())
+            {
+                var parameters = new DynamicParameters();
+                parameters.Add("ReqId", data.ReqId);
+                parameters.Add("BranchCode", data.BranchCode);
+                parameters.Add("ByEmpCode", data.ByEmpCode);
+                parameters.Add("ConfirmedAt", data.ConfirmedAt);
+                parameters.Add("RowsAffected", dbType: DbType.Int32, direction: ParameterDirection.Output);
+
+                connection.Execute("dbo.spDeliveryRequestConfirmReceipt", parameters,
+                    commandType: CommandType.StoredProcedure);
+
+                return parameters.Get<int>("RowsAffected") > 0;
+            }
+        }
+
         public IReadOnlyList<StatusHistoryEntry> ListHistory(int reqId, string branchCode)
         {
             RequireBranch(branchCode);

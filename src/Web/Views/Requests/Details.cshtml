@@ -40,7 +40,7 @@
             </div>
         </div>
 
-        @if (Model.Actions.Count > 0)
+        @if (Model.Actions.Count > 0 || Model.CanConfirmReceipt)
         {
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-white fw-semibold">ดำเนินการ</div>
@@ -49,7 +49,8 @@
                     {
                         ReqId = request.ReqId,
                         Actions = Model.Actions,
-                        ReturnTo = "details"
+                        ReturnTo = "details",
+                        CanConfirmReceipt = Model.CanConfirmReceipt
                     })
                 </div>
             </div>
@@ -107,6 +108,28 @@
                     <dt class="col-sm-4 col-lg-3">รายละเอียดงาน</dt>
                     <dd class="col-sm-8 col-lg-9" style="white-space: pre-line;">@request.Detail</dd>
 
+                    @if (request.RequiresReceiptConfirmation)
+                    {
+                        <dt class="col-sm-4 col-lg-3">การรับของ (BR-4)</dt>
+                        <dd class="col-sm-8 col-lg-9">
+                            @if (request.ReceiptConfirmed)
+                            {
+                                <span class="badge text-bg-success">ยืนยันรับของแล้ว</span>
+                                if (request.ReceiptConfirmedAt.HasValue)
+                                {
+                                    <span class="text-body-secondary">
+                                        · @request.ReceiptConfirmedAt.Value.ToString("dd/MM/yyyy HH:mm")
+                                        โดย @request.ReceiptConfirmedBy
+                                    </span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-warning">ยังไม่ได้ยืนยันรับของ</span>
+                            }
+                        </dd>
+                    }
+
                     @if (request.Assignment != null)
                     {
                         <dt class="col-sm-4 col-lg-3">ผู้รับงาน</dt>
@@ -161,6 +184,8 @@
             </div>
         </div>
 
+        @Html.Partial("_Photos", Model)
+
         <div class="card shadow-sm">
             <div class="card-header bg-white fw-semibold">ประวัติสถานะ</div>
             <div class="card-body">
@@ -196,3 +221,7 @@
 
     </div>
 </div>
+
+@section scripts {
+    <script src="@Url.Content("~/Scripts/photo-upload.js")"></script>
+}

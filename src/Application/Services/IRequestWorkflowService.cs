@@ -27,6 +27,17 @@ namespace Messenger.Application.Services
         /// </summary>
         ServiceResult<DeliveryRequest> Apply(int reqId, RequestAction action, string reason, UserContext user);
 
+        /// <summary>
+        /// กดยืนยันว่า "รับของกลับมาแล้ว" (BR-4)
+        ///
+        /// ไม่ใช่การเปลี่ยนสถานะ จึงไม่อยู่ในตาราง §6 แต่เป็นเงื่อนไขที่ต้องผ่าน
+        /// ก่อนปิดงานของใบที่มีประเภทงาน "รับเอกสาร"
+        /// </summary>
+        ServiceResult<DeliveryRequest> ConfirmReceipt(int reqId, UserContext user);
+
+        /// <summary>ผู้ใช้คนนี้กดปุ่ม "ยืนยันรับของแล้ว" กับใบงานนี้ได้หรือไม่ (ใช้ตัดสินว่าจะโชว์ปุ่ม)</summary>
+        bool CanConfirmReceipt(DeliveryRequest request, UserContext user);
+
         /// <summary>คิวงานของสาขาในวันที่กำหนด — เปิดให้เฉพาะ Messenger/Admin (§5)</summary>
         ServiceResult<QueueDay> GetQueue(UserContext user, DateTime sendDate);
 
