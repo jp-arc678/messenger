@@ -44,3 +44,7 @@ appsettings.local.json
 # หมายเหตุ : App_Data/EmailTemplates ยังต้องเข้า repo เพราะเป็น template ตั้งต้น
 src/Web/App_Data/Photos/
 src/Web/App_Data/Mail/
+
+# applicationhost.config ที่ tools\Start-ForMobile.ps1 generate ให้ตอนรัน
+# มี path เต็มของเครื่องอยู่ข้างใน จึงเป็นของเฉพาะเครื่อง ไม่ใช่ของ repo
+tools/.iisexpress/
