@@ -10,6 +10,43 @@ dt {
     color: #495057;
 }
 
+/* ช่องกรอกวันที่ วว/ดด/ปปปป (D34 — ดู Scripts/date-field.js)
+   <input type="date"> ตัวจริงถูกซ้อนแบบโปร่งใสทับปุ่มปฏิทิน จึงยังกดเรียก
+   ปฏิทินของเครื่องได้ แต่รูปแบบที่ผู้ใช้เห็นมาจากช่องข้อความที่เราคุมเอง */
+.date-field {
+    position: relative;
+}
+
+    .date-field > input[type="text"] {
+        padding-right: 2.75rem;
+    }
+
+.date-field-picker {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 2.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    cursor: pointer;
+}
+
+    .date-field-picker > input[type="date"] {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        opacity: 0;
+        cursor: pointer;
+    }
+
 /* จอเล็ก (มือถือ/แท็บเล็ต) : ทำให้ปุ่มกดง่ายขึ้น */
 @media (max-width: 576px) {
     .btn {

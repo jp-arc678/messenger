@@ -259,6 +259,16 @@ GO
    @SendDateFrom / @SendDateTo       : ช่วงวันส่ง (ส่ง NULL = ไม่กรอง)
    @RequestDateFrom / @RequestDateTo : ช่วง "วันที่บันทึก" (ส่ง NULL = ไม่กรอง)
    @Status                           : สถานะเดียว (ส่ง NULL = ทุกสถานะ)
+
+   คืน result set 2 ชุด :
+     ชุดที่ 1 = ใบแจ้งงานที่ผ่านเงื่อนไข
+     ชุดที่ 2 = ประเภทงาน (พร้อม DetailText) ของใบงานในชุดที่ 1 ทั้งหมด
+
+   ทำไมต้องมีชุดที่ 2 ทั้งที่ view มี JobTypeCodes อยู่แล้ว :
+   JobTypeCodes รวมมาแค่ "รหัส" ประเภทงาน ไม่มี DetailText เพราะ DetailText เป็น
+   ข้อความอิสระของผู้ใช้ จะเอามาต่อสตริงคั่นด้วยจุลภาคแล้วแยกกลับให้ถูกไม่ได้
+   (ผู้ใช้พิมพ์จุลภาคเองก็พังทันที) จึงคืนเป็นแถวจริงอีกชุด — ยังเป็น query ชุดเดียว
+   ไม่ใช่ N+1 แบบเรียก spRequestJobTypeListByReq ทีละใบ
    ============================================================= */
 IF OBJECT_ID(N'dbo.spDeliveryRequestList', N'P') IS NOT NULL
     DROP PROCEDURE dbo.spDeliveryRequestList;
@@ -281,14 +291,12 @@ BEGIN
     DECLARE @RequestDateToExclusive DATETIME2(0) =
         CASE WHEN @RequestDateTo IS NULL THEN NULL ELSE DATEADD(DAY, 1, CAST(@RequestDateTo AS DATETIME2(0))) END;
 
-    SELECT ReqId, ReqNo, BranchCode, BranchName,
-           RequesterEmpCode, RequesterName, RequesterDeptCode, RequesterUnitName,
-           RequesterPhoneExt, RequesterEmail,
-           RequestDateTime, SendDate, ContactName, Address, Phone, Detail,
-           Status, IsPersonal, ReceiptConfirmed, ReceiptConfirmedAt, ReceiptConfirmedBy, [RowVersion],
-           CreatedBy, CreatedAt, UpdatedBy, UpdatedAt,
-           MessengerEmpCode, MessengerName, ConfirmedAt, SequenceOrder,
-           Route, DistanceKm, ReturnToOffice, JobTypeCodes
+    -- คัดใบงานที่ผ่านเงื่อนไขเก็บไว้ก่อน แล้วให้ result set ทั้งสองชุดอ้างอิงชุดนี้
+    -- จะได้ไม่ต้องเขียน WHERE ซ้ำสองที่ (ซึ่งวันหนึ่งจะแก้ที่เดียวแล้วหลุดไม่ตรงกัน)
+    DECLARE @Matched TABLE (ReqId INT NOT NULL PRIMARY KEY);
+
+    INSERT INTO @Matched (ReqId)
+    SELECT ReqId
     FROM dbo.vwDeliveryRequest
     WHERE BranchCode = @BranchCode
       AND (@RequesterEmpCode IS NULL OR RequesterEmpCode = @RequesterEmpCode)
@@ -296,8 +304,28 @@ BEGIN
       AND (@SendDateTo       IS NULL OR SendDate <= @SendDateTo)
       AND (@RequestDateFrom  IS NULL OR RequestDateTime >= @RequestDateFrom)
       AND (@RequestDateToExclusive IS NULL OR RequestDateTime < @RequestDateToExclusive)
-      AND (@Status           IS NULL OR Status = @Status)
-    ORDER BY SendDate DESC, ReqNo DESC;
+      AND (@Status           IS NULL OR Status = @Status);
+
+    -- ชุดที่ 1 : ใบแจ้งงาน
+    SELECT v.ReqId, v.ReqNo, v.BranchCode, v.BranchName,
+           v.RequesterEmpCode, v.RequesterName, v.RequesterDeptCode, v.RequesterUnitName,
+           v.RequesterPhoneExt, v.RequesterEmail,
+           v.RequestDateTime, v.SendDate, v.ContactName, v.Address, v.Phone, v.Detail,
+           v.Status, v.IsPersonal, v.ReceiptConfirmed, v.ReceiptConfirmedAt, v.ReceiptConfirmedBy, v.[RowVersion],
+           v.CreatedBy, v.CreatedAt, v.UpdatedBy, v.UpdatedAt,
+           v.MessengerEmpCode, v.MessengerName, v.ConfirmedAt, v.SequenceOrder,
+           v.Route, v.DistanceKm, v.ReturnToOffice, v.JobTypeCodes
+    FROM dbo.vwDeliveryRequest AS v
+    INNER JOIN @Matched AS m
+            ON m.ReqId = v.ReqId
+    ORDER BY v.SendDate DESC, v.ReqNo DESC;
+
+    -- ชุดที่ 2 : ประเภทงานของใบงานข้างบน (พร้อมรายละเอียดต่อประเภท)
+    SELECT j.ReqJobTypeId, j.ReqId, j.JobType, j.DetailText
+    FROM dbo.tblRequestJobType AS j
+    INNER JOIN @Matched AS m
+            ON m.ReqId = j.ReqId
+    ORDER BY j.ReqId, j.ReqJobTypeId;
 END
 GO
 

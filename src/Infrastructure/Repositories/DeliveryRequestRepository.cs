@@ -157,8 +157,10 @@ namespace Messenger.Infrastructure.Repositories
         }
 
         /// <summary>
-        /// หมายเหตุ : รายการนี้ "ไม่" ดึงประเภทงานมาด้วย เพื่อเลี่ยง query แบบ N+1
-        /// หน้าจอที่ต้องเห็นประเภทงานให้เปิดดูรายใบผ่าน <see cref="GetById"/>
+        /// ดึงใบแจ้งงานพร้อม "ประเภทงาน + รายละเอียดต่อประเภท" มาให้ครบในตัว
+        ///
+        /// spDeliveryRequestList คืน result set 2 ชุด (ใบงาน / ประเภทงานของใบงานทั้งชุด)
+        /// จึงยังเป็นการวิ่ง DB รอบเดียว ไม่ใช่ N+1 แบบเรียก spRequestJobTypeListByReq ทีละใบ
         /// </summary>
         public IReadOnlyList<DeliveryRequest> List(RequestListFilter filter)
         {
@@ -181,11 +183,32 @@ namespace Messenger.Infrastructure.Repositories
                 parameters.Add("Status",
                     filter.Status.HasValue ? RequestStatuses.ToCode(filter.Status.Value) : null);
 
-                var rows = connection.Query<DeliveryRequestRow>(
+                using (var results = connection.QueryMultiple(
                     "dbo.spDeliveryRequestList", parameters,
-                    commandType: CommandType.StoredProcedure);
+                    commandType: CommandType.StoredProcedure))
+                {
+                    var requests = results.Read<DeliveryRequestRow>()
+                        .Select(r => r.ToEntity())
+                        .ToList();
 
-                return rows.Select(r => r.ToEntity()).ToList();
+                    var jobTypesByReq = results.Read<RequestJobTypeRow>()
+                        .GroupBy(j => j.ReqId)
+                        .ToDictionary(
+                            group => group.Key,
+                            group => (IList<RequestJobType>)group.Select(j => j.ToEntity()).ToList());
+
+                    // ToEntity() ตั้ง JobTypes จาก JobTypeCodes ของ view ไว้แล้วแต่ไม่มี DetailText
+                    // จึงทับด้วยแถวจริงเสมอ ใบที่ไม่มีประเภทงานเลยได้ list ว่างไปตามเดิม
+                    foreach (var request in requests)
+                    {
+                        IList<RequestJobType> jobTypes;
+                        request.JobTypes = jobTypesByReq.TryGetValue(request.ReqId, out jobTypes)
+                            ? jobTypes
+                            : new List<RequestJobType>();
+                    }
+
+                    return requests;
+                }
             }
         }
 

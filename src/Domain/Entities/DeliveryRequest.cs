@@ -18,6 +18,14 @@ namespace Messenger.Domain.Entities
         public string DetailText { get; set; }
 
         public string JobTypeDisplayName => JobTypes.ToDisplayName(JobType);
+
+        /// <summary>
+        /// ข้อความสรุปของประเภทงานรายการเดียว เช่น "ต่อภาษี : รถ Toyota vigo"
+        /// ถ้าไม่ได้กรอกรายละเอียดจะเหลือแค่ชื่อประเภท เช่น "ต่อภาษี"
+        /// </summary>
+        public string DisplayText => string.IsNullOrWhiteSpace(DetailText)
+            ? JobTypeDisplayName
+            : JobTypeDisplayName + " : " + DetailText.Trim();
     }
 
     /// <summary>

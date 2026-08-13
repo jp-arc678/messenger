@@ -7,8 +7,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@ViewBag.Title - ระบบแจ้งงานรับ-ส่งเอกสาร</title>
-    <link rel="stylesheet" href="@Url.Content("~/Content/bootstrap.min.css")" />
-    <link rel="stylesheet" href="@Url.Content("~/Content/site.css")" />
+    @* Url.Asset = ต่อท้ายด้วย ?v={เวลาแก้ไขไฟล์} กันเบราว์เซอร์หยิบไฟล์เก่าใน cache มาใช้
+       (สำคัญกับ site.css เพราะถ้าได้ css เก่า ช่องวันที่ตาม D34 จะเพี้ยนกลับไปเป็น mm/dd/yyyy) *@
+    <link rel="stylesheet" href="@Url.Asset("~/Content/bootstrap.min.css")" />
+    <link rel="stylesheet" href="@Url.Asset("~/Content/site.css")" />
 </head>
 <body class="bg-body-tertiary">
 
@@ -78,7 +80,9 @@
         Messenger Document Delivery System
     </footer>
 
-    <script src="@Url.Content("~/Scripts/bootstrap.bundle.min.js")"></script>
+    <script src="@Url.Asset("~/Scripts/bootstrap.bundle.min.js")"></script>
+    @* D34 — โหลดทุกหน้า เพราะช่องวันที่กระจายอยู่หลายหน้า (ฟอร์ม/รายการ/คิวงาน/รายงาน) *@
+    <script src="@Url.Asset("~/Scripts/date-field.js")"></script>
     @RenderSection("scripts", required: false)
 </body>
 </html>

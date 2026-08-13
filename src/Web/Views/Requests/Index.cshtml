@@ -67,12 +67,10 @@ else
                 <tr>
                     <th scope="col">เลขใบงาน</th>
                     <th scope="col">วันที่บันทึก</th>
+                    <th scope="col">ผู้แจ้ง</th>
                     <th scope="col">วันที่ส่ง</th>
+                    <th scope="col">ประเภทงาน</th>
                     <th scope="col">ผู้ติดต่อ</th>
-                    @if (Model.SeesWholeBranch)
-                    {
-                        <th scope="col">ผู้แจ้ง</th>
-                    }
                     <th scope="col">สถานะ</th>
                     <th scope="col" class="text-end">ดู</th>
                 </tr>
@@ -89,6 +87,7 @@ else
                             }
                         </td>
                         <td>@request.RequestDateTime.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>@request.RequesterName</td>
                         <td>
                             @request.SendDate.ToString("dd/MM/yyyy")
                             @if (request.SequenceOrder.HasValue)
@@ -96,11 +95,22 @@ else
                                 <span class="badge text-bg-dark ms-1" title="ลำดับวิ่งงานของวัน">@request.SequenceOrder</span>
                             }
                         </td>
+                        <td>
+                            @if (request.JobTypes == null || request.JobTypes.Count == 0)
+                            {
+                                <span class="text-body-secondary">—</span>
+                            }
+                            else
+                            {
+                                <ul class="list-unstyled mb-0 small">
+                                    @foreach (var jobType in request.JobTypes)
+                                    {
+                                        <li>@jobType.DisplayText</li>
+                                    }
+                                </ul>
+                            }
+                        </td>
                         <td>@request.ContactName</td>
-                        @if (Model.SeesWholeBranch)
-                        {
-                            <td>@request.RequesterName</td>
-                        }
                         <td><span class="badge text-bg-secondary">@request.StatusDisplayName</span></td>
                         <td class="text-end">
                             <a class="btn btn-sm btn-outline-primary"
