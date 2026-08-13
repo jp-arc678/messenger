@@ -19,7 +19,7 @@
                        href="@Url.Action("Details", "Requests", new { id = request.ReqId })">
                         <code>@request.ReqNo</code>
                     </a>
-                    <span class="badge text-bg-secondary">@request.StatusDisplayName</span>
+                    <span class="badge @StatusBadge.CssClass(request.Status)">@request.StatusDisplayName</span>
                     @if (request.IsPersonal)
                     {
                         <span class="badge text-bg-light">ส่วนตัว</span>

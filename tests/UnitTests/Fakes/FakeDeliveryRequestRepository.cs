@@ -83,8 +83,10 @@ namespace Messenger.UnitTests.Fakes
         {
             return _requests.Values
                 .Where(r => SameText(r.BranchCode, filter.BranchCode))
-                .Where(r => filter.RequesterEmpCode == null ||
-                            SameText(r.RequesterEmpCode, filter.RequesterEmpCode))
+                // D37 — "ใบของฉัน" = เป็นผู้แจ้ง หรือเป็นคนกดสร้าง (ต้องตรงกับ spDeliveryRequestList)
+                .Where(r => filter.VisibleToEmpCode == null ||
+                            SameText(r.RequesterEmpCode, filter.VisibleToEmpCode) ||
+                            SameText(r.CreatedBy, filter.VisibleToEmpCode))
                 .Where(r => !filter.SendDateFrom.HasValue || r.SendDate >= filter.SendDateFrom.Value)
                 .Where(r => !filter.SendDateTo.HasValue || r.SendDate <= filter.SendDateTo.Value)
                 .Where(r => !filter.RequestDateFrom.HasValue || r.RequestDateTime >= filter.RequestDateFrom.Value.Date)

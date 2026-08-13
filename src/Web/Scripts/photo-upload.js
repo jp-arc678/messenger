@@ -30,6 +30,19 @@
         return;
     }
 
+    /**
+     * ข้อผิดพลาดที่ลองไฟล์เดิมซ้ำอีกกี่ครั้งก็ไม่มีทางผ่าน (เช่น เลือกไฟล์ที่ไม่ใช่รูป)
+     * แยกจากข้อผิดพลาดชั่วคราวอย่างเน็ตหลุด เพื่อจะได้ไม่ต่อท้ายว่า "ลองใหม่อีกครั้ง"
+     * ซึ่งทำให้ผู้ใช้นั่งกดซ้ำกับไฟล์เดิมโดยไม่รู้ว่าต้องเปลี่ยนไฟล์
+     */
+    function PermanentError(message) {
+        this.name = 'PermanentError';
+        this.message = message;
+        this.permanent = true;
+    }
+    PermanentError.prototype = Object.create(Error.prototype);
+    PermanentError.prototype.constructor = PermanentError;
+
     function setBusy(busy, message) {
         if (button) {
             button.disabled = busy;
@@ -51,7 +64,10 @@
             };
             image.onerror = function () {
                 URL.revokeObjectURL(url);
-                reject(new Error('เปิดไฟล์รูปไม่ได้'));
+                // ไฟล์ที่เปิดเป็นรูปไม่ได้ = ไม่ใช่รูปจริง (เช่น .pdf ที่เปลี่ยนนามสกุลเป็น .jpg)
+                // หรือไฟล์เสียหาย — ทั้งสองกรณีลองไฟล์เดิมซ้ำก็ไม่มีทางผ่าน จึงต้องบอกให้เปลี่ยนไฟล์
+                reject(new PermanentError(
+                    'ไฟล์นี้ไม่ใช่รูปภาพ หรือไฟล์เสียหาย — กรุณาเลือกไฟล์รูป (.jpg หรือ .png)'));
             };
 
             image.src = url;
@@ -137,7 +153,9 @@
                 window.location.reload();
             })
             .catch(function (error) {
-                setBusy(false, error.message + ' — ลองใหม่อีกครั้ง');
+                setBusy(false, error.permanent
+                    ? error.message
+                    : error.message + ' — ลองใหม่อีกครั้ง');
             });
     });
 })();

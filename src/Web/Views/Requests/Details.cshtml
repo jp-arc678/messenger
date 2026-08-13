@@ -25,7 +25,7 @@
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
             <div>
                 <h1 class="h4 mb-1">@request.ReqNo</h1>
-                <span class="badge text-bg-secondary">@request.StatusDisplayName</span>
+                <span class="badge @StatusBadge.CssClass(request.Status)">@request.StatusDisplayName</span>
                 <span class="badge text-bg-primary">สาขา @request.BranchCode</span>
                 @if (request.SequenceOrder.HasValue)
                 {
@@ -209,9 +209,12 @@
                                     @entry.ChangedAt.ToString("dd/MM/yyyy HH:mm")
                                 </div>
                                 <div>
-                                    <span class="badge text-bg-secondary">@entry.ToStatusDisplayName</span>
+                                    <span class="badge @StatusBadge.CssClass(entry.ToStatus)">@entry.ToStatusDisplayName</span>
+                                    @* แสดงรหัสพนักงานคู่กับชื่อเสมอ — ชื่อซ้ำกันได้ รหัสเป็นตัวชี้ตัวจริง *@
                                     <span class="text-body-secondary small ms-1">
                                         โดย @(string.IsNullOrWhiteSpace(entry.ByName) ? entry.ByEmpCode : entry.ByName)
+                                        @if (!string.IsNullOrWhiteSpace(entry.ByName) && !string.IsNullOrWhiteSpace(entry.ByEmpCode))
+                                        {<text>(@entry.ByEmpCode)</text>}
                                     </span>
                                     @if (!string.IsNullOrWhiteSpace(entry.Note))
                                     {

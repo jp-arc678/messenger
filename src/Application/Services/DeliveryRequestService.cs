@@ -228,8 +228,8 @@ namespace Messenger.Application.Services
                 // BR-6 — สาขามาจากตัวผู้ใช้เสมอ ไม่ใช่จากหน้าจอ
                 BranchCode = user.BranchCode,
 
-                // §5 — Admin/Messenger เห็นทั้งสาขา, User เห็นเฉพาะใบตัวเอง
-                RequesterEmpCode = SeesWholeBranch(user) ? null : user.EmpCode,
+                // §5 — Admin/Messenger เห็นทั้งสาขา, User เห็นเฉพาะใบที่ตัวเองเกี่ยวข้อง (D37)
+                VisibleToEmpCode = SeesWholeBranch(user) ? null : user.EmpCode,
 
                 SendDateFrom = query.SendDateFrom,
                 SendDateTo = query.SendDateTo,
@@ -258,10 +258,7 @@ namespace Messenger.Application.Services
 
         private bool CanView(DeliveryRequest request, UserContext user)
         {
-            if (!SameBranch(request.BranchCode, user.BranchCode))
-                return false;
-
-            return SeesWholeBranch(user) || IsOwner(request, user);
+            return RequestAccess.CanSee(request, user);
         }
 
         private static bool SeesWholeBranch(UserContext user)

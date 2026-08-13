@@ -514,18 +514,81 @@ namespace Messenger.UnitTests
         }
 
         [Test]
-        public void รายการใบงานของ_User_เห็นเฉพาะใบตัวเอง()
+        public void รายการใบงานของ_User_ต้องไม่มีใบที่ตัวเองไม่เกี่ยวข้อง()
         {
+            // 10004 แจ้งเอง — 10002 ไม่ได้เป็นทั้งผู้แจ้งและคนกรอก จึงต้องไม่เห็น
+            _service.Create(ValidCommand(), User("10004"));
             _service.Create(ValidCommand(), User("10002"));
-
-            var otherPersonCommand = ValidCommand();
-            otherPersonCommand.RequesterEmpCode = "10004";
-            _service.Create(otherPersonCommand, User("10002"));
 
             var mine = _service.List(User("10002"), new RequestListQuery());
 
             Assert.That(mine.Count, Is.EqualTo(1));
             Assert.That(mine.All(r => r.RequesterEmpCode == "10002"), Is.True);
+        }
+
+        // ==================== D37 : คนกดสร้างต้องเห็นใบที่ตัวเองแจ้งแทนคนอื่น ====================
+
+        [Test]
+        public void แจ้งแทนคนอื่นแล้ว_คนกรอกต้องยังเปิดดูใบนั้นได้()
+        {
+            // ก่อนแก้ D37 ข้อนี้พังทันทีที่บันทึกเสร็จ เพราะ Create เด้งไปหน้ารายละเอียด
+            // แล้ว Get() ตอบว่า "คุณไม่มีสิทธิ์ดูใบแจ้งงานนี้" — แจ้งแทนคนอื่นจึงใช้งานไม่ได้จริง
+            var command = ValidCommand();
+            command.RequesterEmpCode = "10004";
+
+            var created = _service.Create(command, User("10002", "SDC"));
+            var seen = _service.Get(created.Value.ReqId, User("10002", "SDC"));
+
+            Assert.That(seen.Success, Is.True, seen.FirstError);
+        }
+
+        [Test]
+        public void แจ้งแทนคนอื่นแล้ว_ใบนั้นต้องอยู่ในรายการของคนกรอกด้วย()
+        {
+            var command = ValidCommand();
+            command.RequesterEmpCode = "10004";
+            _service.Create(command, User("10002", "SDC"));
+
+            var mine = _service.List(User("10002", "SDC"), new RequestListQuery());
+
+            Assert.That(mine.Count, Is.EqualTo(1));
+            Assert.That(mine[0].RequesterEmpCode, Is.EqualTo("10004"));
+            Assert.That(mine[0].CreatedBy, Is.EqualTo("10002"));
+        }
+
+        [Test]
+        public void แจ้งแทนคนอื่นแล้ว_ผู้แจ้งก็ต้องเห็นใบของตัวเอง()
+        {
+            var command = ValidCommand();
+            command.RequesterEmpCode = "10004";
+            var created = _service.Create(command, User("10002", "SDC"));
+
+            Assert.That(_service.Get(created.Value.ReqId, User("10004", "SDC")).Success, Is.True);
+            Assert.That(_service.List(User("10004", "SDC"), new RequestListQuery()).Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void สิทธิ์ดูที่กว้างขึ้นต้องไม่ทำให้คนกรอกแก้ใบงานได้()
+        {
+            // D17 ยังเหมือนเดิม : สิทธิ์แก้/ยกเลิกเป็นของ "ผู้แจ้ง" คนเดียว
+            // D37 ขยายแค่สิทธิ์ "ดู" เท่านั้น
+            var command = ValidCommand();
+            command.RequesterEmpCode = "10004";
+            var created = _service.Create(command, User("10002", "SDC"));
+
+            Assert.That(_service.CanEdit(created.Value, User("10002", "SDC")), Is.False);
+            Assert.That(_service.CanEdit(created.Value, User("10004", "SDC")), Is.True);
+        }
+
+        [Test]
+        public void สิทธิ์ดูที่กว้างขึ้นต้องไม่ทะลุข้ามสาขา()
+        {
+            // BR-6 ยังต้องมาก่อนเสมอ แม้ CreatedBy จะตรงกันก็ตาม
+            var created = _service.Create(ValidCommand(), User("10002", "SDC"));
+
+            var intruder = User("10002", "SBK");
+
+            Assert.That(_service.Get(created.Value.ReqId, intruder).Success, Is.False);
         }
 
         [Test]

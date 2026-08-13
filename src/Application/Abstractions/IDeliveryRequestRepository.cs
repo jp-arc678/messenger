@@ -82,8 +82,13 @@ namespace Messenger.Application.Abstractions
     {
         public string BranchCode { get; set; }
 
-        /// <summary>null = ทั้งสาขา (Admin/Messenger) · มีค่า = เฉพาะใบของคนนั้น (User)</summary>
-        public string RequesterEmpCode { get; set; }
+        /// <summary>
+        /// null = ทั้งสาขา (Admin/Messenger) · มีค่า = เฉพาะใบที่คนนั้นเกี่ยวข้อง (User)
+        ///
+        /// "เกี่ยวข้อง" = เป็น**ผู้แจ้ง** หรือเป็น**คนกดสร้าง** (D37) — ต้องรวมคนกดสร้างด้วย
+        /// ไม่งั้นใบที่แจ้งแทนคนอื่นตาม D17 จะหายไปจากรายการของคนกรอกทันทีที่บันทึก
+        /// </summary>
+        public string VisibleToEmpCode { get; set; }
 
         public DateTime? SendDateFrom { get; set; }
 

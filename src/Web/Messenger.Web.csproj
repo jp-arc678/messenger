@@ -88,6 +88,7 @@
     <Compile Include="Controllers\ReportsController.cs" />
     <Compile Include="Controllers\RequestsController.cs" />
     <Compile Include="Helpers\AssetUrl.cs" />
+    <Compile Include="Helpers\StatusBadge.cs" />
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>

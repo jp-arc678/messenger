@@ -174,8 +174,8 @@ namespace Messenger.Infrastructure.Repositories
             {
                 var parameters = new DynamicParameters();
                 parameters.Add("BranchCode", filter.BranchCode);
-                parameters.Add("RequesterEmpCode",
-                    string.IsNullOrWhiteSpace(filter.RequesterEmpCode) ? null : filter.RequesterEmpCode.Trim());
+                parameters.Add("VisibleToEmpCode",
+                    string.IsNullOrWhiteSpace(filter.VisibleToEmpCode) ? null : filter.VisibleToEmpCode.Trim());
                 parameters.Add("SendDateFrom", filter.SendDateFrom?.Date, DbType.Date);
                 parameters.Add("SendDateTo", filter.SendDateTo?.Date, DbType.Date);
                 parameters.Add("RequestDateFrom", filter.RequestDateFrom?.Date, DbType.Date);

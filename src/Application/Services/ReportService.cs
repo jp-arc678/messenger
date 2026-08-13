@@ -54,7 +54,7 @@ namespace Messenger.Application.Services
             var requests = _requests.List(new RequestListFilter
             {
                 BranchCode = user.BranchCode,
-                RequesterEmpCode = wholeBranch ? null : user.EmpCode,
+                VisibleToEmpCode = wholeBranch ? null : user.EmpCode,
                 SendDateFrom = from,
                 SendDateTo = to
             });

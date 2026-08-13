@@ -264,7 +264,7 @@ namespace Messenger.Application.Services
                 return ServiceResult<IReadOnlyList<StatusHistoryEntry>>.Fail("ไม่พบใบแจ้งงานนี้ในสาขาของคุณ");
 
             // §5 — คนที่ดูใบงานไม่ได้ ก็ต้องดูประวัติไม่ได้เช่นกัน
-            if (!RequestAccess.SeesWholeBranch(user) && !RequestAccess.IsOwner(request, user))
+            if (!RequestAccess.CanSee(request, user))
                 return ServiceResult<IReadOnlyList<StatusHistoryEntry>>.Fail("คุณไม่มีสิทธิ์ดูใบแจ้งงานนี้");
 
             return ServiceResult<IReadOnlyList<StatusHistoryEntry>>.Ok(

@@ -251,10 +251,14 @@ GO
 /* =============================================================
    spDeliveryRequestList — รายการใบแจ้งงานของสาขา
 
-   @RequesterEmpCode :
-     - ส่งรหัสพนักงาน = เห็นเฉพาะใบของคนนั้น (ใช้กับ U-User ตาม §5)
+   @VisibleToEmpCode :
+     - ส่งรหัสพนักงาน = เห็นเฉพาะใบที่คนนั้นเกี่ยวข้อง (ใช้กับ U-User ตาม §5)
      - ส่ง NULL       = เห็นทุกใบในสาขา (ใช้กับ A-Admin / M-Messenger)
    การตัดสินใจว่าจะส่งค่าไหน เป็นหน้าที่ของ service layer
+
+   "เกี่ยวข้อง" = เป็นผู้แจ้ง (RequesterEmpCode) **หรือ** เป็นคนกดสร้าง (CreatedBy) ตาม D37
+   ต้องรวมคนกดสร้างด้วย ไม่งั้นใบที่แจ้งแทนคนอื่นตาม D17 จะหายไปจากรายการของคนกรอก
+   ทันทีที่บันทึก และหากลับมาดูอีกไม่ได้เลย
 
    @SendDateFrom / @SendDateTo       : ช่วงวันส่ง (ส่ง NULL = ไม่กรอง)
    @RequestDateFrom / @RequestDateTo : ช่วง "วันที่บันทึก" (ส่ง NULL = ไม่กรอง)
@@ -276,7 +280,7 @@ GO
 
 CREATE PROCEDURE dbo.spDeliveryRequestList
     @BranchCode         CHAR(3),
-    @RequesterEmpCode   VARCHAR(20) = NULL,
+    @VisibleToEmpCode   VARCHAR(20) = NULL,
     @SendDateFrom       DATE        = NULL,
     @SendDateTo         DATE        = NULL,
     @RequestDateFrom    DATE        = NULL,
@@ -299,7 +303,9 @@ BEGIN
     SELECT ReqId
     FROM dbo.vwDeliveryRequest
     WHERE BranchCode = @BranchCode
-      AND (@RequesterEmpCode IS NULL OR RequesterEmpCode = @RequesterEmpCode)
+      AND (@VisibleToEmpCode IS NULL
+           OR RequesterEmpCode = @VisibleToEmpCode
+           OR CreatedBy        = @VisibleToEmpCode)
       AND (@SendDateFrom     IS NULL OR SendDate >= @SendDateFrom)
       AND (@SendDateTo       IS NULL OR SendDate <= @SendDateTo)
       AND (@RequestDateFrom  IS NULL OR RequestDateTime >= @RequestDateFrom)

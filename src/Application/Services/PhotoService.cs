@@ -210,7 +210,8 @@ namespace Messenger.Application.Services
 
         private static bool CanView(DeliveryRequest request, UserContext user)
         {
-            return RequestAccess.SeesWholeBranch(user) || RequestAccess.IsOwner(request, user);
+            // D25 — การ "ดู" รูปใช้สิทธิ์เดียวกับการดูใบงาน (รวมคนที่กดสร้างตาม D37)
+            return RequestAccess.CanSee(request, user);
         }
 
         /// <summary>
