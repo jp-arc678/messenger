@@ -108,7 +108,31 @@
         return attempt(0.85);
     }
 
+    /**
+     * ปฏิเสธไฟล์ที่ไม่ใช่รูปตั้งแต่ก่อนส่ง (UAT-01)
+     *
+     * เดิมไฟล์ผิดชนิดจะถูกส่งขึ้นไปให้ server ปฏิเสธ ซึ่งใช้ได้กับไฟล์เล็ก
+     * แต่ถ้าไฟล์ใหญ่เกิน maxRequestLength ด้วย ASP.NET จะตัด request ทิ้ง
+     * ก่อนถึงโค้ดตรวจไฟล์ ผู้ใช้เลยได้หน้า error เปล่า ๆ แทนคำอธิบาย
+     * ดักตรงนี้ทำให้รู้ผลทันทีโดยไม่ต้องรออัปโหลดไฟล์ใหญ่จนจบก่อนค่อยพัง
+     */
+    function assertLooksLikeImage(file) {
+        var name = (file.name || '').toLowerCase();
+        var byExtension = /\.(jpe?g|png)$/.test(name);
+        // บางเบราว์เซอร์/บางไฟล์ไม่ส่ง type มาให้ ตกลงไปใช้นามสกุลแทน
+        var byType = file.type === 'image/jpeg' || file.type === 'image/png';
+
+        if (byType || (!file.type && byExtension)) {
+            return;
+        }
+
+        throw new PermanentError(
+            'ระบบรับเฉพาะไฟล์รูป JPG และ PNG — กรุณาเลือกไฟล์รูปแล้วลองใหม่');
+    }
+
     function prepare(file) {
+        assertLooksLikeImage(file);
+
         // ไฟล์เล็กอยู่แล้วก็ส่งของเดิมไป ไม่ต้องแปลงให้เสียคุณภาพฟรี ๆ
         if (file.size <= maxBytes) {
             return Promise.resolve(file);
@@ -134,7 +158,10 @@
         event.preventDefault();
         setBusy(true, 'กำลังย่อรูป…');
 
-        prepare(file)
+        // prepare() โยน error แบบ synchronous ได้ (assertLooksLikeImage)
+        // ห่อด้วย Promise.resolve().then เพื่อให้ทุกกรณีไหลลง .catch เส้นเดียวกัน
+        Promise.resolve()
+            .then(function () { return prepare(file); })
             .then(function (prepared) {
                 var data = new FormData(form);
                 data.set('file', prepared, prepared.name || 'photo.jpg');
@@ -146,6 +173,12 @@
                 });
             })
             .then(function (response) {
+                // 413 = ไฟล์ทะลุ maxRequestLength ตั้งแต่ชั้น ASP.NET (ดู Global.asax)
+                // ลองไฟล์เดิมซ้ำก็ไม่มีทางผ่าน จึงต้องบอกให้เปลี่ยนไฟล์
+                if (response.status === 413) {
+                    throw new PermanentError(
+                        'ไฟล์ใหญ่เกินกว่าที่ระบบรับได้ — กรุณาเลือกไฟล์รูป JPG หรือ PNG ที่เล็กลง');
+                }
                 if (!response.ok) {
                     throw new Error('อัปโหลดไม่สำเร็จ (' + response.status + ')');
                 }

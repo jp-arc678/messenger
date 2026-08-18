@@ -36,6 +36,9 @@ namespace Messenger.Web.Composition
         /// <summary>ค่าที่ใส่ใน EmailPickupDirectory เพื่อบอกว่า "ส่งจริงผ่าน SMTP"</summary>
         private const string NoPickupDirectory = "none";
 
+        /// <summary>เลื่อนนาฬิกาของระบบกี่นาที — สำหรับทดสอบ BR-1 เท่านั้น (ดู ResolveClock)</summary>
+        public const string ClockOffsetMinutesSetting = "ClockOffsetMinutes";
+
         public static IDependencyResolver Build()
         {
             var connectionString = ReadConnectionString();
@@ -61,7 +64,7 @@ namespace Messenger.Web.Composition
             // D3 — SSO ยังเป็น stub ในเฟส 0 เมื่อได้ contract จริงให้สลับบรรทัดนี้บรรทัดเดียว
             ISsoClient sso = new MockSsoClient();
 
-            IClock clock = new SystemClock();
+            IClock clock = ResolveClock();
 
             IAuthService authService = new AuthService(sso, employees, branches);
             IDeliveryRequestService requestService = new DeliveryRequestService(requests, employees, clock);
@@ -104,6 +107,39 @@ namespace Messenger.Web.Composition
             };
 
             return new MessengerDependencyResolver(factories);
+        }
+
+        /// <summary>
+        /// เลือกนาฬิกาที่ระบบจะใช้ — ปกติคือเวลาจริงของเครื่อง
+        ///
+        /// ตั้ง appSetting <c>ClockOffsetMinutes</c> เป็นจำนวนนาทีเพื่อเลื่อนเวลาของ "ระบบ"
+        /// ใช้ทดสอบเส้นแบ่ง 10:00 ของ BR-1 (UAT 2.4) ได้ทุกเวลาโดยไม่ต้องรอเช้าและ
+        /// ไม่ต้องไปแตะนาฬิกาของ Windows — เช่น <c>-780</c> = ถอยหลัง 13 ชั่วโมง
+        ///
+        /// กันเผลอ : ยอมใช้เฉพาะตอน &lt;compilation debug="true"&gt; เท่านั้น
+        /// production ตั้ง debug="false" อยู่แล้วจึงได้ SystemClock เสมอ ต่อให้ลืมลบค่าทิ้ง
+        /// (อ่าน section ตรง ๆ แทนการพึ่ง HttpContext เพราะโค้ดนี้รันตอน Application_Start)
+        /// </summary>
+        private static IClock ResolveClock()
+        {
+            var configured = ConfigurationManager.AppSettings[ClockOffsetMinutesSetting];
+
+            double minutes;
+            if (string.IsNullOrWhiteSpace(configured) ||
+                !double.TryParse(configured.Trim(), System.Globalization.NumberStyles.Float,
+                                 System.Globalization.CultureInfo.InvariantCulture, out minutes) ||
+                minutes == 0)
+            {
+                return new SystemClock();
+            }
+
+            var compilation = ConfigurationManager.GetSection("system.web/compilation")
+                              as System.Web.Configuration.CompilationSection;
+
+            if (compilation == null || !compilation.Debug)
+                return new SystemClock();
+
+            return new OffsetClock(TimeSpan.FromMinutes(minutes));
         }
 
         /// <summary>
