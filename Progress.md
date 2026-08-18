@@ -1,11 +1,24 @@
 # Progress — สถานะงาน ณ 18/08/2026 (สิ้นวัน)
 
 > เอกสารส่งต่อสำหรับทำงานต่อวันถัดไป · อ่านไฟล์นี้ก่อนเริ่ม แล้วค่อยดู [CLAUDE.md](CLAUDE.md)
-> งานวันนี้ : ปิดงานที่ค้างจากขั้นที่ 1 (unit test + ทดสอบพฤติกรรมจริง) และ **ปิด UAT-01 ได้แล้ว**
+> งานวันนี้ : ปิดของค้างจากขั้นที่ 1 ทั้งหมด แล้วปิดเพิ่มอีก 4 เรื่อง —
+> **UAT-01 · 2.4 · 4.5 · 8.1–8.3** · UAT ขยับจาก 54/61 เป็น **59/61** และ**ไม่เหลือข้อบกพร่องเปิดค้าง**
 
 ---
 
 ## 1. เริ่มพรุ่งนี้ตรงนี้
+
+**ลำดับงานพรุ่งนี้ (ไล่จากบนลงล่าง)**
+
+| # | งาน | ต้องมีอะไรก่อน | ตัดสินใจโดย |
+|---|---|---|---|
+| 1 | **8.4 + 8.5 บนมือถือจริง** → ปิด UAT ได้ทันที | มือถือ 1 เครื่องต่อ Wi-Fi วงเดียวกัน | — |
+| 2 | **push 15 commits ขึ้น GitHub** (§4.2) | — | **ผู้ใช้** |
+| 3 | **เก็บสคริปต์ทดสอบ 5 ตัวจาก scratchpad เข้า `tools\`** (§4.1) | — | **ผู้ใช้** |
+| 4 | ล้างข้อมูลทดสอบใน DB (§5) — ทำหรือไม่ทำก็ได้ | — | **ผู้ใช้** |
+
+> ถ้ายังไม่มีมือถือ ข้อ 1 ข้ามไปก่อนได้ แต่ **UAT จะปิดไม่ได้** จนกว่าจะไล่ 2 ข้อนั้น
+> (ทุกอย่างที่ทดสอบแทนได้ ทดสอบครบหมดแล้ว)
 
 ### ✅ เสร็จแล้ว (18/08/2026) — ขั้นที่ 1 และ 2 ของแผนเดิม
 
@@ -16,7 +29,7 @@
 | UAT-01 — ไฟล์เกิน 8 MB ต้องได้ 413 | ✅ พิสูจน์แล้วด้วย `tools\Test-UploadTooLarge.ps1` (8 assertion ผ่านหมด) |
 | UAT 2.4 — เส้นแบ่ง 10:00 ของ BR-1 | ✅ พิสูจน์แล้วด้วย `tools\Test-Br1Clock.ps1` (5 assertion ผ่านหมด) |
 | UAT 4.5 — ย่อรูปฝั่ง client ≤ 2 MB | ✅ พิสูจน์แล้วด้วย `tools\Test-PhotoResize.ps1` (15 assertion ผ่านหมด) |
-| UAT 8.1–8.3 — หน้าจอ 390px | ✅ `tools\Test-MobileLayout.ps1` (64 assertion ผ่านหมด) — \*\*device emulation\*\* ไม่ใช่เครื่องจริง |
+| UAT 8.1–8.3 — หน้าจอ 390px | ✅ `tools\Test-MobileLayout.ps1` (64 assertion ผ่านหมด) — **device emulation** ไม่ใช่เครื่องจริง |
 
 **UAT-01 ปิดแล้ว** — ทดสอบซ้ำครบ 4 เคสเดิม : PDF 12 MB → **413** · PNG 10.57 MB → **413**
 (ทั้งคู่มีหน้าอธิบายภาษาไทย) · PNG 2.64 MB → "ไฟล์ใหญ่เกิน 2 MB" · PDF 1 MB → "รองรับเฉพาะ JPG และ PNG"
@@ -47,11 +60,33 @@
 > ทั้งสองข้อเป็นพฤติกรรมของ **OS มือถือ** ไม่ใช่ของ layout engine จำลองแทนไม่ได้จริง ๆ
 > ถ้าเจ้าของระบบอยากได้หลักฐานจากเครื่องจริงของ 8.1–8.3 ด้วย ให้ไล่ซ้ำตอนได้เครื่องมาพร้อมกัน
 
-### วิธีรันเว็บสำหรับทดสอบ (localhost)
+### วิธีรันเว็บ + ทดสอบซ้ำทั้งชุด
 
 ```powershell
+# 1. เว็บ (ถ้ามีตัวเก่าค้างอยู่ ต้อง Stop-Process ก่อน ไม่งั้นพอร์ตชนกัน)
 & "C:\Program Files\IIS Express\iisexpress.exe" /path:"D:\Projects\Messenger\src\Web" /port:52080
+
+# 2. unit test (257 ตัว)
+dotnet test tests\UnitTests\Messenger.UnitTests.csproj
+#    ⚠ หลังรัน dotnet test แล้ว ถ้าจะ build ใหม่ ต้อง msbuild -t:restore คั่นก่อน (ดู §6 ข้อ 5)
+
+# 3. เทสต์ที่ยิงของจริงใส่เว็บ — ต้องเปิดเว็บไว้ก่อน
+pwsh -File tools\Test-BranchIsolation.ps1     # BR-6 + สิทธิ์ (D33)
+pwsh -File tools\Test-UploadTooLarge.ps1      # UAT-01 — ไฟล์เกิน 8 MB ต้องได้ 413
+pwsh -File tools\Test-Br1Clock.ps1            # UAT 2.4 — เส้นแบ่ง 10:00 ของ BR-1
+pwsh -File tools\Test-PhotoResize.ps1         # UAT 4.5 — ย่อรูปฝั่ง client (ต้องมี Chrome + Node 22+)
+pwsh -File tools\Test-MobileLayout.ps1        # UAT 8.1–8.3 — จอ 390px (ต้องมี Chrome + Node 22+)
 ```
+
+| สคริปต์ใน `tools\` | ครอบคลุม | assertion |
+|---|---|---|
+| `Test-BranchIsolation.ps1` | BR-6 + สิทธิ์ตาม role (D33) | 32 |
+| `Test-UploadTooLarge.ps1` | UAT-01 (413) | 8 |
+| `Test-Br1Clock.ps1` | UAT 2.4 (BR-1) | 5 |
+| `Test-PhotoResize.ps1` + `photo-resize-probe.mjs` | UAT 4.5 (BR-3) | 15 |
+| `Test-MobileLayout.ps1` + `mobile-layout-probe.mjs` | UAT 8.1–8.3 | 64 |
+
+> ทุกตัวรันซ้ำได้ไม่จำกัด แต่ **ทิ้งใบงานทดสอบไว้ในฐานข้อมูล** ทุกครั้ง (ดู §4.1)
 
 ---
 
@@ -129,6 +164,9 @@
 
 ### 4.1 สคริปต์ทดสอบ 5 ตัวยังอยู่ใน scratchpad — จะหายเมื่อ session หมดอายุ
 
+> ⚠ ตรวจแล้ว 18/08/2026 : โฟลเดอร์ยังอยู่ครบ แต่เป็นโฟลเดอร์ temp
+> ระบบล้างเมื่อไรก็ได้ · **ถ้าอยากเก็บต้องรีบตัดสินใจ** — รวม 133 assertion ที่เขียนใหม่ก็ใช้เวลาพอควร
+
 > อัปเดต 18/08/2026 : สคริปต์ที่ใช้ปิด UAT-01, 2.4, 4.5 และ 8.1–8.3 **เก็บเข้า `tools\` แล้ว**
 > (`Test-UploadTooLarge.ps1`, `Test-Br1Clock.ps1`, `Test-PhotoResize.ps1` + `photo-resize-probe.mjs`,
 > `Test-MobileLayout.ps1` + `mobile-layout-probe.mjs`) เพราะเป็นหลักฐานของข้อที่ปิดไปแล้ว
@@ -154,9 +192,9 @@ C:\Users\CHAIYA~1.B\AppData\Local\Temp\claude\d--Projects-Messenger\
 
 > รูปแบบเดียวกับ `tools\Test-BranchIsolation.ps1` ที่ D33 บังคับให้ดูแลอยู่แล้ว
 
-### 4.2 commit ค้าง push อยู่ **11 รายการ**
+### 4.2 commit ค้าง push อยู่ **15 รายการ**
 
-`main` นำหน้า `origin/main` 11 commits — ยังไม่ push ขึ้น GitHub
+`main` นำหน้า `origin/main` 15 commits — ยังไม่ push ขึ้น GitHub (ยังไม่เคยสั่ง push เลย)
 
 ---
 
@@ -166,8 +204,9 @@ C:\Users\CHAIYA~1.B\AppData\Local\Temp\claude\d--Projects-Messenger\
   · ⚠ ตัวที่เปิดค้างจากเมื่อวาน **ไม่ตายเอง** ต้อง `Stop-Process` ก่อนเปิดตัวใหม่ ไม่งั้นตัวใหม่
   ขึ้นไม่ได้ ("Cannot create a file when that file already exists" = พอร์ตถูกจองอยู่)
 - **Web.config** อยู่ในสภาพปกติ : `EmailPickupDirectory` = ว่าง · `ClockOffsetMinutes` = ว่าง
-- **ข้อมูลทดสอบใน DB** เพิ่มมาระหว่างวันหลายใบ (`MSG-SDC-2608-0032` ถึง `~0053`,
-  `MSG-SBK-2608-0002`) และรูป 1 รูป — ไม่ได้ลบทิ้ง เผื่อใช้ทดสอบต่อ
+- **ข้อมูลทดสอบใน DB** ตอนนี้มีใบงานรวม **61 ใบ** (ล่าสุด `MSG-SDC-2608-0059`) และรูป **8 รูป**
+  · ที่เพิ่มวันนี้มาจากสคริปต์ทดสอบล้วน ๆ ไม่ได้ลบทิ้ง เผื่อใช้ทดสอบต่อ
+  · ถ้าจะล้าง ให้ดูใบที่ผู้ติดต่อขึ้นต้นด้วย "บริษัท ทดสอบ" (ดูก่อนลบเสมอ)
 - **พนักงาน `20099`** ถูก cache ลง `tblEmployee`/`tblUserRole` จากการทดสอบ 1.3
 
 ---
