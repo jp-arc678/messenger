@@ -7,18 +7,23 @@
 
 ## 1. เริ่มพรุ่งนี้ตรงนี้ (ทำตามลำดับ)
 
-### ขั้นที่ 1 — build ให้ผ่านก่อนอย่างอื่นทั้งหมด
+### ขั้นที่ 1 — build ✅ ผ่านแล้ว (18/08/2026)
 
 ```powershell
-pwsh -File tools\Verify.ps1        # SQL + build + unit test ต้องผ่านทั้งหมด
+& "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\MSBuild.exe" "D:\Projects\Messenger\Messenger.sln" -t:build -v:m -nologo
 ```
 
-**เหตุผลที่ยังไม่ได้ทำ:** เครื่องมือรันคำสั่งของ agent เสียตอนท้ายวัน
-(`Tool permission request failed: Error: (intermediate value).finally is not a function`)
-ล้มแม้กระทั่งคำสั่งเปล่า ๆ จึง **build ไม่ได้เลย** โค้ดที่แก้ไว้ใน §2
-จึงยัง **ไม่รู้ว่าคอมไพล์ผ่านหรือไม่** และ **ยังไม่ได้ commit**
+ผ่านครบทุกโปรเจกต์ (Domain · Application · Infrastructure · Web · UnitTests)
+โค้ดใน §2 จึง **commit แล้ว** ที่ `4dac8d1`
 
-ถ้า build ไม่ผ่าน ให้ดู §2 ว่าแตะอะไรไปบ้าง
+**ยังเหลือที่ยังทำไม่ได้** เพราะเครื่องมือรันคำสั่งของ agent ยังบล็อกคำสั่งที่ต้อง
+ขออนุญาตใหม่อยู่ (`Tool permission request failed: ... .finally is not a function`) :
+
+- `dotnet test` — ยังไม่ได้รัน unit test 257 ตัว
+- เปิด IIS Express — จึงยัง **ทดสอบพฤติกรรมจริงไม่ได้** ทั้ง 413 และ OffsetClock
+
+**ทางแก้** : เพิ่ม 2 รายการนี้ใน `.claude/settings.local.json` → `permissions.allow`
+(ผู้ใช้ต้องอนุมัติเอง) หรือรันคำสั่งเองแล้วบอกผลกลับมา
 
 ### ขั้นที่ 2 — ทดสอบ UAT 2.4 ด้วยนาฬิกาจำลอง (ของใหม่ที่เพิ่งทำ)
 
@@ -42,7 +47,7 @@ pwsh -File tools\Verify.ps1        # SQL + build + unit test ต้องผ่�
 
 ---
 
-## 2. งานค้างใน working tree — ยังไม่ build ยังไม่ commit
+## 2. โค้ดที่แก้ไป — commit แล้วที่ `4dac8d1` (build ผ่าน · ยังไม่ทดสอบพฤติกรรม)
 
 5 ไฟล์ (แก้ 4 + ใหม่ 1) แก้ 2 เรื่องพร้อมกัน
 
@@ -67,11 +72,14 @@ pwsh -File tools\Verify.ps1        # SQL + build + unit test ต้องผ่�
 **กลไกกันเผลอ:** ค่านี้ถูกเมินทั้งหมดเมื่อ `<compilation debug="false">` (คือตอน production)
 ต่อให้ลืมลบค่าทิ้งไว้ก็ไม่มีทางเลื่อนเวลาของระบบจริงได้
 
-### ⚠️ ยังไม่ได้ตรวจ
+### สถานะการตรวจ
 
-- ยังไม่ build → ไม่รู้ว่าคอมไพล์ผ่านไหม
-- ยังไม่ทดสอบว่า 413 ทำงานจริง (เดิมไฟล์ 12 MB ได้ 500 — ต้องยิงซ้ำแล้วต้องได้ 413)
-- ยังไม่ทดสอบว่า `OffsetClock` ถูกหยิบไปใช้จริง
+- ✅ build ผ่านครบทุกโปรเจกต์ (18/08/2026)
+- ❌ ยังไม่ทดสอบว่า 413 ทำงานจริง — เดิมไฟล์ 12 MB ได้ 500 **ต้องยิงซ้ำแล้วต้องได้ 413**
+- ❌ ยังไม่ทดสอบว่า `OffsetClock` ถูกหยิบไปใช้จริง
+- ❌ ยังไม่ได้รัน unit test 257 ตัว
+
+**UAT-01 จึงยังไม่ปิด** — แก้แล้วแต่ยังพิสูจน์ไม่ได้ว่าหาย
 
 ---
 
